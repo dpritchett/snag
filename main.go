@@ -9,7 +9,7 @@ import (
 
 var Version = "dev"
 
-func main() {
+func buildRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:     "snag",
 		Short:   "Composable git hook policy kit",
@@ -22,12 +22,10 @@ func main() {
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "suppress non-error output")
 
 	diffCmd := &cobra.Command{
-		Use:   "diff",
-		Short: "Check staged diff against policies",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("snag: diff not implemented")
-			return nil
-		},
+		Use:          "diff",
+		Short:        "Check staged diff against policies",
+		SilenceUsage: true,
+		RunE:         runDiff,
 	}
 
 	msgCmd := &cobra.Command{
@@ -50,8 +48,11 @@ func main() {
 	}
 
 	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd)
+	return rootCmd
+}
 
-	if err := rootCmd.Execute(); err != nil {
+func main() {
+	if err := buildRootCmd().Execute(); err != nil {
 		os.Exit(1)
 	}
 }
