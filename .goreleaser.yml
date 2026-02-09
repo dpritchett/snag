@@ -1,0 +1,22 @@
+version: 2
+
+builds:
+  - binary: snag
+    ldflags:
+      - -s -w -X main.Version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+changelog:
+  sort: asc

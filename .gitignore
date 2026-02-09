@@ -1,6 +1,9 @@
 # Binary
 /snag
 
+# GoReleaser
+dist/
+
 # Test artifacts
 *.test
 coverage.out
