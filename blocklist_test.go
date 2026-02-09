@@ -128,6 +128,28 @@ func TestLoadEnvBlocklist(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("colon-separated", func(t *testing.T) {
+		t.Setenv("SNAG_BLOCKLIST", "word1:WORD2:word3")
+		p := loadEnvBlocklist()
+		want := []string{"word1", "word2", "word3"}
+		if len(p) != len(want) {
+			t.Fatalf("got %d patterns, want %d", len(p), len(want))
+		}
+		for i := range want {
+			if p[i] != want[i] {
+				t.Errorf("patterns[%d] = %q, want %q", i, p[i], want[i])
+			}
+		}
+	})
+
+	t.Run("mixed colons and newlines", func(t *testing.T) {
+		t.Setenv("SNAG_BLOCKLIST", "word1:word2\nword3")
+		p := loadEnvBlocklist()
+		if len(p) != 3 {
+			t.Fatalf("got %d patterns, want 3", len(p))
+		}
+	})
 }
 
 func TestDeduplicatePatterns(t *testing.T) {

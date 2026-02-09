@@ -201,11 +201,22 @@ snag: 4 patterns checked against 3 commits
 ### Environment variables
 
 ```
-SNAG_BLOCKLIST      # extra patterns (same format as a .blocklist file), always merged
+SNAG_BLOCKLIST      # extra patterns, colon or newline separated, always merged
+```
+
+```bash
+# single line — colon-separated
+export SNAG_BLOCKLIST="secretword:codename:do not merge"
+
+# multi-line also works (same format as a .blocklist file)
+export SNAG_BLOCKLIST="secretword
+codename
+do not merge"
 ```
 
 `SNAG_BLOCKLIST` is additive — its patterns are merged on top of whatever the
-directory walk (or explicit `--blocklist`) found. Handy for CI, direnv, or mise.
+directory walk (or explicit `--blocklist`) found. Handy for CI, shell rc files,
+direnv, or mise.
 
 ## `.blocklist` file format
 

@@ -74,14 +74,16 @@ func walkBlocklists(dir string) ([]string, error) {
 	return all, nil
 }
 
-// loadEnvBlocklist parses the SNAG_BLOCKLIST environment variable using the
-// same rules as a blocklist file: one pattern per line, # comments, blanks
-// skipped, lowercased.
+// loadEnvBlocklist parses the SNAG_BLOCKLIST environment variable.
+// Patterns can be separated by newlines or colons (or both).
+// Comments (#) and blank entries are skipped. All patterns are lowercased.
 func loadEnvBlocklist() []string {
 	val := os.Getenv("SNAG_BLOCKLIST")
 	if val == "" {
 		return nil
 	}
+	// Normalize colons to newlines so both delimiters work.
+	val = strings.ReplaceAll(val, ":", "\n")
 	var patterns []string
 	for _, line := range strings.Split(val, "\n") {
 		line = strings.TrimSpace(line)
