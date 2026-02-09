@@ -32,6 +32,12 @@ snag is that project, kept small on purpose.
 go install github.com/dpritchett/snag@latest
 ```
 
+### mise
+
+```bash
+mise use -g go:github.com/dpritchett/snag@latest
+```
+
 ### Binary releases
 
 Pre-built binaries are available on the
@@ -45,19 +51,26 @@ just point your lefthook remotes at this repo.
 
 ## Quick start
 
-Point your repo's `lefthook.yml` at the recipes you want:
+If you already have a lefthook config, the fastest path is:
+
+```bash
+snag install-hooks   # adds the snag remote to your lefthook config
+lefthook install     # activates the hooks
+```
+
+Or add the remote manually:
 
 ```yaml
 # lefthook.yml
 remotes:
   - git_url: https://github.com/dpritchett/snag.git
-    ref: main
+    ref: v0.4.3
     configs:
       - recipes/lefthook-blocklist.yml
       - recipes/lefthook-gitleaks.yml
 ```
 
-Add a `.blocklist` to your repo root:
+Add a `.blocklist` to your repo root (or a parent directory):
 
 ```
 # Patterns to deny (case-insensitive substring match)
@@ -111,12 +124,12 @@ remotes:
 
 ## CLI usage
 
-Three subcommands, one per hook phase:
-
 ```
-snag diff          # pre-commit: scan staged changes
-snag msg FILE      # commit-msg: clean trailers, reject body matches
-snag push          # pre-push: scan all unpushed commits
+snag diff              # pre-commit: scan staged changes
+snag msg FILE          # commit-msg: clean trailers, reject body matches
+snag push              # pre-push: scan all unpushed commits
+snag install-hooks     # add/update snag remote in lefthook config
+snag version           # print version and exit
 ```
 
 All three perform case-insensitive substring matching and exit 0 (clean) or 1
@@ -127,6 +140,22 @@ loading every `.blocklist` it finds and merging all patterns. A parent directory
 blocklist protects every repo underneath it — no per-repo setup required.
 
 If `--blocklist` is passed explicitly, only that file is used (no walk).
+
+### `snag install-hooks`
+
+Adds or updates the snag remote in your lefthook config. Finds
+`lefthook.yml`, `lefthook.yaml`, `.lefthook.yml`, or `.lefthook.yaml`.
+Pins the `ref` to the running binary's version.
+
+```
+$ snag install-hooks
+Added snag v0.4.3 remote to lefthook.yaml
+Run `lefthook install` to activate.
+```
+
+If a snag remote already exists at an older version, it updates the ref
+in place without touching the rest of the file. If it's already current,
+it does nothing.
 
 ### `snag diff`
 
@@ -238,6 +267,30 @@ pre-push:
     }
   }
 }
+```
+
+### pre-commit (Python framework)
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: snag-diff
+        name: snag blocklist
+        entry: snag diff
+        language: system
+        stages: [pre-commit]
+      - id: snag-msg
+        name: snag commit message
+        entry: snag msg
+        language: system
+        stages: [commit-msg]
+      - id: snag-push
+        name: snag push check
+        entry: snag push
+        language: system
+        stages: [pre-push]
 ```
 
 ### Raw githooks
