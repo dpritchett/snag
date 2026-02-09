@@ -60,7 +60,14 @@ func buildRootCmd() *cobra.Command {
 		},
 	}
 
-	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd, versionCmd)
+	installHooksCmd := &cobra.Command{
+		Use:          "install-hooks",
+		Short:        "Add or update snag remote in lefthook.yml",
+		SilenceUsage: true,
+		RunE:         runInstallHooks,
+	}
+
+	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd, versionCmd, installHooksCmd)
 	return rootCmd
 }
 
