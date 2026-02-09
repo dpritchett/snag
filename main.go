@@ -11,10 +11,36 @@ import (
 var Version = "dev"
 
 func init() {
-	if Version == "dev" {
-		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
-			Version = info.Main.Version
+	if Version != "dev" {
+		return
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+
+	// Local build — use VCS info for a short, readable version.
+	var revision, modified string
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			if len(s.Value) >= 7 {
+				revision = s.Value[:7]
+			}
+		case "vcs.modified":
+			if s.Value == "true" {
+				modified = "-dirty"
+			}
 		}
+	}
+	if revision != "" {
+		Version = "dev+" + revision + modified
+		return
+	}
+
+	// go install @version — no VCS info, but module version is set.
+	if v := info.Main.Version; v != "" && v != "(devel)" {
+		Version = v
 	}
 }
 
