@@ -366,3 +366,79 @@ func TestInstallHooks_NonTTYDefaultsToShared(t *testing.T) {
 		t.Error("local config should not have been created in non-TTY mode")
 	}
 }
+
+func TestInstallHooks_DryRunDoesNotWrite(t *testing.T) {
+	dir := t.TempDir()
+	initial := "pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--dry-run"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// File should be unchanged.
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if string(data) != initial {
+		t.Error("--dry-run should not modify the file")
+	}
+}
+
+func TestInstallHooks_DryRunLocalDoesNotCreate(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--local", "--dry-run"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// lefthook-local.yml should NOT have been created.
+	if _, err := os.Stat(filepath.Join(dir, "lefthook-local.yml")); err == nil {
+		t.Error("--dry-run --local should not create the file")
+	}
+}
+
+func TestInstallHooks_DryRunUpdate(t *testing.T) {
+	dir := t.TempDir()
+	initial := `pre-commit:
+  commands:
+    lint:
+      run: echo lint
+remotes:
+  - git_url: https://github.com/dpritchett/snag.git
+    ref: v0.1.0
+    configs:
+      - recipes/lefthook-blocklist.yml
+`
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--dry-run"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// File should still have the old ref.
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if !strings.Contains(string(data), "v0.1.0") {
+		t.Error("--dry-run should not update the ref")
+	}
+}

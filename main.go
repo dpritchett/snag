@@ -68,6 +68,7 @@ func buildRootCmd() *cobra.Command {
 	}
 	installHooksCmd.Flags().Bool("local", false, "install to lefthook-local.yml (gitignored, just for you)")
 	installHooksCmd.Flags().Bool("shared", false, "install to lefthook.yml (checked in, whole team)")
+	installHooksCmd.Flags().BoolP("dry-run", "n", false, "show what would be changed without writing files")
 	installHooksCmd.MarkFlagsMutuallyExclusive("local", "shared")
 
 	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd, versionCmd, installHooksCmd)
