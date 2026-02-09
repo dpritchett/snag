@@ -2,21 +2,19 @@ version: 2
 
 builds:
   - binary: snag
+    # Pure Go — no CGO deps. Disabling speeds up cross-compilation.
+    env:
+      - CGO_ENABLED=0
     ldflags:
       - -s -w -X main.Version={{.Version}}
+    # Linux + macOS only. Windows was dropped because it added ~46s
+    # to a ~52s release build and nobody uses snag on Windows yet.
     goos:
       - linux
       - darwin
-      - windows
     goarch:
       - amd64
       - arm64
-
-archives:
-  - format_overrides:
-      - goos: windows
-        formats:
-          - zip
 
 changelog:
   sort: asc
