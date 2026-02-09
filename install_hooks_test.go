@@ -19,8 +19,30 @@ func TestInstallHooks_NoLefthookYml(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when no lefthook.yml exists")
 	}
-	if !strings.Contains(err.Error(), "no lefthook.yml found") {
+	if !strings.Contains(err.Error(), "no lefthook config found") {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestInstallHooks_FindsYamlExtension(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "lefthook.yaml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yaml"))
+	content := string(data)
+	if !strings.Contains(content, "github.com/dpritchett/snag") {
+		t.Error("expected snag remote in lefthook.yaml")
 	}
 }
 

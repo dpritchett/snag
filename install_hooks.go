@@ -14,14 +14,32 @@ var defaultRecipes = []string{
 	"recipes/lefthook-blocklist.yml",
 }
 
+// lefthookCandidates lists filenames lefthook accepts, in priority order.
+var lefthookCandidates = []string{
+	"lefthook.yml",
+	"lefthook.yaml",
+	".lefthook.yml",
+	".lefthook.yaml",
+}
+
+// findLefthookConfig returns the first existing lefthook config filename.
+func findLefthookConfig() (string, error) {
+	for _, name := range lefthookCandidates {
+		if _, err := os.Stat(name); err == nil {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("no lefthook config found (tried %v) — run `lefthook init` first", lefthookCandidates)
+}
+
 func runInstallHooks(cmd *cobra.Command, args []string) error {
-	const filename = "lefthook.yml"
+	filename, err := findLefthookConfig()
+	if err != nil {
+		return err
+	}
 
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("no %s found — run `lefthook init` first", filename)
-		}
 		return fmt.Errorf("reading %s: %w", filename, err)
 	}
 
