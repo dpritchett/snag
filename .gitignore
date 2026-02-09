@@ -1,6 +1,9 @@
 # Binary
 /snag
 
+# Blocklist is local policy — never commit it
+.blocklist
+
 # GoReleaser
 dist/
 

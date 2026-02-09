@@ -119,9 +119,14 @@ snag msg FILE      # commit-msg: clean trailers, reject body matches
 snag push          # pre-push: scan all unpushed commits
 ```
 
-All three read `.blocklist` from the repo root (via
-`git rev-parse --show-toplevel`), perform case-insensitive substring matching,
-and exit 0 (clean) or 1 (match found, with a human-readable error).
+All three perform case-insensitive substring matching and exit 0 (clean) or 1
+(match found, with a human-readable error).
+
+By default, snag walks up from the current directory to the filesystem root,
+loading every `.blocklist` it finds and merging all patterns. A parent directory
+blocklist protects every repo underneath it — no per-repo setup required.
+
+If `--blocklist` is passed explicitly, only that file is used (no walk).
 
 ### `snag diff`
 
@@ -159,13 +164,19 @@ snag: 4 patterns checked against 3 commits
 ### Flags
 
 ```
---blocklist PATH    # override .blocklist location (default: repo root)
+--blocklist PATH    # use only this blocklist file (disables directory walk)
 --quiet             # suppress informational output
 --version           # print version and exit
 ```
 
-No config files. No environment variables. No YAML. The `.blocklist` file is
-the entire configuration surface.
+### Environment variables
+
+```
+SNAG_BLOCKLIST      # extra patterns (same format as a .blocklist file), always merged
+```
+
+`SNAG_BLOCKLIST` is additive — its patterns are merged on top of whatever the
+directory walk (or explicit `--blocklist`) found. Handy for CI, direnv, or mise.
 
 ## `.blocklist` file format
 
@@ -179,9 +190,17 @@ fixme
 WIP
 ```
 
-Each repo carries its own `.blocklist` with whatever patterns make sense for
-that project. snag ships no default patterns — that's a policy decision, not a
-tool decision.
+Each repo can carry its own `.blocklist` with whatever patterns make sense for
+that project. You can also place a `.blocklist` in a parent directory to cover
+every repo underneath it:
+
+```
+~/projects/acme/.blocklist          ← "codename", "customername"
+~/projects/acme/api/.blocklist      ← additional repo-specific patterns (optional)
+~/projects/acme/api/service/        ← no .blocklist, still protected by both above
+```
+
+snag ships no default patterns — that's a policy decision, not a tool decision.
 
 ## Hook runner examples
 

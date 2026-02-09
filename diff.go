@@ -9,16 +9,11 @@ import (
 )
 
 func runDiff(cmd *cobra.Command, args []string) error {
-	path, err := cmd.Flags().GetString("blocklist")
+	patterns, err := resolvePatterns(cmd)
 	if err != nil {
 		return err
 	}
-
-	patterns, err := loadBlocklist(path)
-	if err != nil {
-		return fmt.Errorf("loading blocklist: %w", err)
-	}
-	if patterns == nil {
+	if len(patterns) == 0 {
 		return nil
 	}
 

@@ -55,6 +55,109 @@ func TestLoadBlocklist(t *testing.T) {
 	})
 }
 
+func TestWalkBlocklists(t *testing.T) {
+	t.Run("merges parent and child", func(t *testing.T) {
+		parent := t.TempDir()
+		child := filepath.Join(parent, "child")
+		grandchild := filepath.Join(child, "grandchild")
+		os.MkdirAll(grandchild, 0755)
+
+		os.WriteFile(filepath.Join(parent, ".blocklist"), []byte("parent-word\n"), 0644)
+		os.WriteFile(filepath.Join(child, ".blocklist"), []byte("child-word\n"), 0644)
+		// grandchild has no .blocklist
+
+		patterns, err := walkBlocklists(grandchild)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		has := func(want string) bool {
+			for _, p := range patterns {
+				if p == want {
+					return true
+				}
+			}
+			return false
+		}
+		if !has("parent-word") {
+			t.Error("missing parent-word from parent .blocklist")
+		}
+		if !has("child-word") {
+			t.Error("missing child-word from child .blocklist")
+		}
+	})
+
+	t.Run("no blocklists found", func(t *testing.T) {
+		dir := t.TempDir()
+		patterns, err := walkBlocklists(dir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(patterns) != 0 {
+			t.Fatalf("expected empty patterns, got %v", patterns)
+		}
+	})
+}
+
+func TestLoadEnvBlocklist(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		t.Setenv("SNAG_BLOCKLIST", "")
+		if p := loadEnvBlocklist(); len(p) != 0 {
+			t.Fatalf("expected nil, got %v", p)
+		}
+	})
+
+	t.Run("single pattern", func(t *testing.T) {
+		t.Setenv("SNAG_BLOCKLIST", "forbidden")
+		p := loadEnvBlocklist()
+		if len(p) != 1 || p[0] != "forbidden" {
+			t.Fatalf("got %v, want [forbidden]", p)
+		}
+	})
+
+	t.Run("multi-line with comments", func(t *testing.T) {
+		t.Setenv("SNAG_BLOCKLIST", "# comment\nword1\n\nWORD2\n# trailing")
+		p := loadEnvBlocklist()
+		want := []string{"word1", "word2"}
+		if len(p) != len(want) {
+			t.Fatalf("got %d patterns, want %d", len(p), len(want))
+		}
+		for i := range want {
+			if p[i] != want[i] {
+				t.Errorf("patterns[%d] = %q, want %q", i, p[i], want[i])
+			}
+		}
+	})
+}
+
+func TestDeduplicatePatterns(t *testing.T) {
+	t.Run("nil input", func(t *testing.T) {
+		if p := deduplicatePatterns(nil); p != nil {
+			t.Fatalf("expected nil, got %v", p)
+		}
+	})
+
+	t.Run("no duplicates", func(t *testing.T) {
+		p := deduplicatePatterns([]string{"a", "b", "c"})
+		if len(p) != 3 {
+			t.Fatalf("expected 3, got %d", len(p))
+		}
+	})
+
+	t.Run("with duplicates preserves order", func(t *testing.T) {
+		p := deduplicatePatterns([]string{"a", "b", "a", "c", "b"})
+		want := []string{"a", "b", "c"}
+		if len(p) != len(want) {
+			t.Fatalf("got %d patterns, want %d", len(p), len(want))
+		}
+		for i := range want {
+			if p[i] != want[i] {
+				t.Errorf("patterns[%d] = %q, want %q", i, p[i], want[i])
+			}
+		}
+	})
+}
+
 func TestMatchesBlocklist(t *testing.T) {
 	patterns := []string{"todo", "fixme", "hack"}
 

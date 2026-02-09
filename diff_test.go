@@ -96,6 +96,109 @@ func TestRunDiff_CleanDiff(t *testing.T) {
 	}
 }
 
+func TestRunDiff_WalkFindsParentBlocklist(t *testing.T) {
+	// Parent dir has a .blocklist, child git repo does not.
+	parent := t.TempDir()
+	os.WriteFile(filepath.Join(parent, ".blocklist"), []byte("secretword\n"), 0644)
+
+	child := filepath.Join(parent, "repo")
+	os.MkdirAll(child, 0755)
+
+	// init git repo in child
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.email", "test@test.com"},
+		{"config", "user.name", "Test"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = child
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	initialCommit(t, child)
+	stageFile(t, child, "leak.txt", "contains secretword here\n")
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(child)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"diff"}) // no --blocklist flag
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error from parent blocklist match")
+	}
+	if !strings.Contains(err.Error(), "secretword") {
+		t.Errorf("error should mention 'secretword', got: %v", err)
+	}
+}
+
+func TestRunDiff_EnvVarAddsPatterns(t *testing.T) {
+	dir := initGitRepo(t)
+	initialCommit(t, dir)
+
+	// repo .blocklist blocks "apple", env var adds "banana"
+	os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("apple\n"), 0644)
+	t.Setenv("SNAG_BLOCKLIST", "banana")
+
+	stageFile(t, dir, "fruit.txt", "I like banana\n")
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"diff"}) // no --blocklist, walk + env
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error from env var pattern match")
+	}
+	if !strings.Contains(err.Error(), "banana") {
+		t.Errorf("error should mention 'banana', got: %v", err)
+	}
+}
+
+func TestRunDiff_ExplicitFlagSkipsWalk(t *testing.T) {
+	// Parent has a .blocklist with "parentword"
+	parent := t.TempDir()
+	os.WriteFile(filepath.Join(parent, ".blocklist"), []byte("parentword\n"), 0644)
+
+	child := filepath.Join(parent, "repo")
+	os.MkdirAll(child, 0755)
+
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.email", "test@test.com"},
+		{"config", "user.name", "Test"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = child
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	initialCommit(t, child)
+
+	// child has its own .blocklist with a different word
+	childBl := filepath.Join(child, ".blocklist")
+	os.WriteFile(childBl, []byte("childword\n"), 0644)
+
+	// staged file contains "parentword" but NOT "childword"
+	stageFile(t, child, "data.txt", "parentword is here\n")
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(child)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"diff", "--blocklist", childBl}) // explicit flag
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("expected no error (parent blocklist should be skipped), got: %v", err)
+	}
+}
+
 func TestRunDiff_MatchFound(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)

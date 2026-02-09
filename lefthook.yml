@@ -1,0 +1,14 @@
+pre-commit:
+  commands:
+    blocklist:
+      run: go run . diff
+
+commit-msg:
+  commands:
+    blocklist:
+      run: go run . msg {1}
+
+pre-push:
+  commands:
+    blocklist:
+      run: go run . push

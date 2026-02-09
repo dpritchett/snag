@@ -3,8 +3,12 @@ package main
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // loadBlocklist reads patterns from a file, one per line.
@@ -46,6 +50,93 @@ func matchesBlocklist(text string, patterns []string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// walkBlocklists walks from dir up to the filesystem root, loading every
+// .blocklist file it finds and merging the patterns.
+func walkBlocklists(dir string) ([]string, error) {
+	var all []string
+	current := dir
+	for {
+		p := filepath.Join(current, ".blocklist")
+		patterns, err := loadBlocklist(p)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", p, err)
+		}
+		all = append(all, patterns...)
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return all, nil
+}
+
+// loadEnvBlocklist parses the SNAG_BLOCKLIST environment variable using the
+// same rules as a blocklist file: one pattern per line, # comments, blanks
+// skipped, lowercased.
+func loadEnvBlocklist() []string {
+	val := os.Getenv("SNAG_BLOCKLIST")
+	if val == "" {
+		return nil
+	}
+	var patterns []string
+	for _, line := range strings.Split(val, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		patterns = append(patterns, strings.ToLower(line))
+	}
+	return patterns
+}
+
+// deduplicatePatterns removes duplicate patterns, preserving first-occurrence order.
+func deduplicatePatterns(patterns []string) []string {
+	if len(patterns) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var result []string
+	for _, p := range patterns {
+		if !seen[p] {
+			seen[p] = true
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// resolvePatterns builds the final pattern list for a subcommand.
+// If --blocklist was explicitly passed, only that file is used.
+// Otherwise, .blocklist files are collected by walking up from CWD.
+// The SNAG_BLOCKLIST env var is always merged on top.
+func resolvePatterns(cmd *cobra.Command) ([]string, error) {
+	var patterns []string
+
+	if cmd.Flags().Changed("blocklist") {
+		path, _ := cmd.Flags().GetString("blocklist")
+		p, err := loadBlocklist(path)
+		if err != nil {
+			return nil, fmt.Errorf("loading blocklist: %w", err)
+		}
+		patterns = p
+	} else {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("getting working directory: %w", err)
+		}
+		p, err := walkBlocklists(cwd)
+		if err != nil {
+			return nil, err
+		}
+		patterns = p
+	}
+
+	patterns = append(patterns, loadEnvBlocklist()...)
+	return deduplicatePatterns(patterns), nil
 }
 
 // isTrailerLine reports whether line is a valid Git trailer (Key: Value).
