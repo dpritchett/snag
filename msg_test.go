@@ -133,6 +133,53 @@ func TestRunMsg_TrailerStripped(t *testing.T) {
 	}
 }
 
+func TestRunMsg_TrailerStrippedThenBodyMatch(t *testing.T) {
+	dir := t.TempDir()
+
+	blPath := filepath.Join(dir, ".blocklist")
+	os.WriteFile(blPath, []byte("bot\nfixme\n"), 0644)
+
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	os.WriteFile(msgFile, []byte("TODO fixme later\n\nSigned-off-by: Bot\n"), 0644)
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"msg", "--blocklist", blPath, msgFile})
+	err := rootCmd.Execute()
+
+	w.Close()
+	os.Stderr = oldStderr
+
+	if err == nil {
+		t.Fatal("expected non-nil error for body match after trailer strip")
+	}
+	if !strings.Contains(err.Error(), "fixme") {
+		t.Errorf("error should mention matched pattern 'fixme', got: %v", err)
+	}
+
+	// Trailer should have been stripped from the file on disk
+	got, _ := os.ReadFile(msgFile)
+	if strings.Contains(string(got), "Signed-off-by") {
+		t.Errorf("trailer should have been removed from file, got: %q", got)
+	}
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	stderr := string(buf[:n])
+	if !strings.Contains(stderr, "removed") {
+		t.Errorf("stderr should mention removed trailers, got: %q", stderr)
+	}
+	if !strings.Contains(stderr, `snag: match "fixme"`) {
+		t.Errorf("stderr should contain match message, got: %q", stderr)
+	}
+	if !strings.Contains(stderr, "git commit -eF") {
+		t.Errorf("stderr should contain recovery hint, got: %q", stderr)
+	}
+}
+
 func TestRunMsg_BodyMatch(t *testing.T) {
 	dir := t.TempDir()
 
