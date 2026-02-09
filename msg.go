@@ -49,7 +49,7 @@ func runMsg(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("rewriting commit message: %w", err)
 		}
 		if !quiet {
-			fmt.Fprintf(os.Stderr, "snag: removed %d trailer line(s)\n", removed)
+			warnf("removed %d trailer line(s)", removed)
 		}
 	}
 
@@ -61,8 +61,9 @@ func runMsg(cmd *cobra.Command, args []string) error {
 	}
 
 	if !quiet {
-		fmt.Fprintf(os.Stderr, "snag: match %q in commit message\n", pattern)
-		fmt.Fprintf(os.Stderr, "  to recover: git commit -eF .git/COMMIT_EDITMSG\n")
+		errorf("match %q in commit message", pattern)
+		bell()
+		hintf("to recover: git commit -eF .git/COMMIT_EDITMSG")
 	}
 	return fmt.Errorf("policy violation: %q found in commit message", pattern)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -68,7 +67,8 @@ func runPush(cmd *cobra.Command, args []string) error {
 		}
 		if pattern, found := matchesBlocklist(string(msgOut), patterns); found {
 			if !quiet {
-				fmt.Fprintf(os.Stderr, "snag: match %q in message of %s\n", pattern, short)
+				errorf("match %q in message of %s", pattern, short)
+				bell()
 			}
 			return fmt.Errorf("policy violation: %q found in message of %s", pattern, short)
 		}
@@ -80,14 +80,15 @@ func runPush(cmd *cobra.Command, args []string) error {
 		}
 		if pattern, found := matchesBlocklist(string(diffOut), patterns); found {
 			if !quiet {
-				fmt.Fprintf(os.Stderr, "snag: match %q in diff of %s\n", pattern, short)
+				errorf("match %q in diff of %s", pattern, short)
+				bell()
 			}
 			return fmt.Errorf("policy violation: %q found in diff of %s", pattern, short)
 		}
 	}
 
 	if !quiet {
-		fmt.Fprintf(os.Stderr, "snag: %d patterns checked against %d commits\n", len(patterns), len(shas))
+		infof("%d patterns checked against %d commits", len(patterns), len(shas))
 	}
 	return nil
 }

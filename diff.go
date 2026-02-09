@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
@@ -29,7 +28,8 @@ func runDiff(cmd *cobra.Command, args []string) error {
 
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	if !quiet {
-		fmt.Fprintf(os.Stderr, "snag: match %q in staged diff\n", pattern)
+		errorf("match %q in staged diff", pattern)
+		bell()
 	}
 	return fmt.Errorf("policy violation: %q found in staged diff", pattern)
 }
