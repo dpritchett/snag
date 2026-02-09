@@ -3,16 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
 const snagRemoteURL = "https://github.com/dpritchett/snag.git"
-
-var defaultRecipes = []string{
-	"recipes/lefthook-blocklist.yml",
-}
 
 // lefthookCandidates lists filenames lefthook accepts, in priority order.
 var lefthookCandidates = []string{
@@ -32,6 +29,38 @@ func findLefthookConfig() (string, error) {
 	return "", fmt.Errorf("no lefthook config found (tried %v) — run `lefthook init` first", lefthookCandidates)
 }
 
+// snagRemoteBlock returns a formatted remotes block to append to a lefthook config.
+func snagRemoteBlock(ref string) string {
+	return fmt.Sprintf(`
+remotes:
+  - git_url: %s
+    ref: %s
+    configs:
+      - recipes/lefthook-blocklist.yml
+`, snagRemoteURL, ref)
+}
+
+// findSnagRemote parses the YAML and returns the existing snag remote's ref, or "" if not found.
+func findSnagRemote(data []byte) (string, error) {
+	var raw map[string]interface{}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return "", err
+	}
+
+	remotes, _ := raw["remotes"].([]interface{})
+	for _, r := range remotes {
+		entry, ok := r.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if entry["git_url"] == snagRemoteURL {
+			ref, _ := entry["ref"].(string)
+			return ref, nil
+		}
+	}
+	return "", nil
+}
+
 func runInstallHooks(cmd *cobra.Command, args []string) error {
 	filename, err := findLefthookConfig()
 	if err != nil {
@@ -43,64 +72,44 @@ func runInstallHooks(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("reading %s: %w", filename, err)
 	}
 
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
+	ref := Version
+	existingRef, err := findSnagRemote(data)
+	if err != nil {
 		return fmt.Errorf("parsing %s: %w", filename, err)
 	}
-	if raw == nil {
-		raw = make(map[string]interface{})
-	}
 
-	ref := Version
+	content := string(data)
 
-	// Check existing remotes for a snag entry.
-	remotes, _ := raw["remotes"].([]interface{})
-	for i, r := range remotes {
-		entry, ok := r.(map[string]interface{})
-		if !ok {
-			continue
+	if existingRef == "" {
+		// No snag remote — append block to end of file.
+		if !strings.HasSuffix(content, "\n") {
+			content += "\n"
 		}
-		if entry["git_url"] == snagRemoteURL {
-			existingRef, _ := entry["ref"].(string)
-			if existingRef == ref {
-				fmt.Fprintf(os.Stderr, "snag remote already configured at %s in %s\n", ref, filename)
-				return nil
-			}
-			// Update ref in place.
-			entry["ref"] = ref
-			remotes[i] = entry
-			raw["remotes"] = remotes
-
-			out, err := yaml.Marshal(raw)
-			if err != nil {
-				return fmt.Errorf("marshalling %s: %w", filename, err)
-			}
-			if err := os.WriteFile(filename, out, 0644); err != nil {
-				return fmt.Errorf("writing %s: %w", filename, err)
-			}
-			fmt.Fprintf(os.Stderr, "Updated snag remote from %s to %s in %s\n", existingRef, ref, filename)
-			fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
-			return nil
+		content += snagRemoteBlock(ref)
+		if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+			return fmt.Errorf("writing %s: %w", filename, err)
 		}
+		fmt.Fprintf(os.Stderr, "Added snag %s remote to %s\n", ref, filename)
+		fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
+		return nil
 	}
 
-	// No snag remote found — append one.
-	newRemote := map[string]interface{}{
-		"git_url": snagRemoteURL,
-		"ref":     ref,
-		"configs": defaultRecipes,
+	if existingRef == ref {
+		fmt.Fprintf(os.Stderr, "snag remote already configured at %s in %s\n", ref, filename)
+		return nil
 	}
-	remotes = append(remotes, newRemote)
-	raw["remotes"] = remotes
 
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshalling %s: %w", filename, err)
+	// Snag remote exists at a different version — surgically replace the ref.
+	oldRef := "ref: " + existingRef
+	newRef := "ref: " + ref
+	updated := strings.Replace(content, oldRef, newRef, 1)
+	if updated == content {
+		return fmt.Errorf("found snag remote at %s but could not locate ref line in %s", existingRef, filename)
 	}
-	if err := os.WriteFile(filename, out, 0644); err != nil {
+	if err := os.WriteFile(filename, []byte(updated), 0644); err != nil {
 		return fmt.Errorf("writing %s: %w", filename, err)
 	}
-	fmt.Fprintf(os.Stderr, "Added snag %s remote to %s\n", ref, filename)
+	fmt.Fprintf(os.Stderr, "Updated snag remote from %s to %s in %s\n", existingRef, ref, filename)
 	fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
 	return nil
 }

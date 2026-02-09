@@ -17,7 +17,7 @@ func TestInstallHooks_NoLefthookYml(t *testing.T) {
 	rootCmd.SetArgs([]string{"install-hooks"})
 	err := rootCmd.Execute()
 	if err == nil {
-		t.Fatal("expected error when no lefthook.yml exists")
+		t.Fatal("expected error when no lefthook config exists")
 	}
 	if !strings.Contains(err.Error(), "no lefthook config found") {
 		t.Errorf("unexpected error: %v", err)
@@ -48,7 +48,8 @@ func TestInstallHooks_FindsYamlExtension(t *testing.T) {
 
 func TestInstallHooks_AddsRemote(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+	initial := "# My hooks\npre-commit:\n  commands:\n    lint:\n      run: echo lint\n"
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
@@ -69,11 +70,21 @@ func TestInstallHooks_AddsRemote(t *testing.T) {
 	if !strings.Contains(content, "recipes/lefthook-blocklist.yml") {
 		t.Error("expected blocklist recipe in lefthook.yml")
 	}
+	// Original content must be preserved verbatim.
+	if !strings.HasPrefix(content, initial) {
+		t.Error("original file content was mangled")
+	}
+	// Comment must survive.
+	if !strings.Contains(content, "# My hooks") {
+		t.Error("comment was stripped from file")
+	}
 }
 
 func TestInstallHooks_UpdatesRef(t *testing.T) {
 	dir := t.TempDir()
-	initial := `pre-commit:
+	initial := `# Important hooks
+pre-commit:
+  parallel: true
   commands:
     lint:
       run: echo lint
@@ -102,7 +113,14 @@ remotes:
 		t.Error("old ref v0.1.0 should have been replaced")
 	}
 	if !strings.Contains(content, Version) {
-		t.Errorf("expected current version %s in lefthook.yml, got:\n%s", Version, content)
+		t.Errorf("expected current version %s in lefthook.yml", Version)
+	}
+	// Everything except the ref line must be preserved.
+	if !strings.Contains(content, "# Important hooks") {
+		t.Error("comment was stripped during ref update")
+	}
+	if !strings.Contains(content, "parallel: true") {
+		t.Error("parallel key was lost during ref update")
 	}
 }
 
@@ -131,7 +149,6 @@ remotes:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// File should not have been rewritten — read it and check it's unchanged.
 	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
 	if string(data) != initial {
 		t.Error("file should not have been modified when already at current version")
