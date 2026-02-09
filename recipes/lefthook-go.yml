@@ -3,9 +3,13 @@ pre-commit:
     go-fmt:
       glob: "*.go"
       run: go fmt ./...
+      stage_fixed: true
+      fail_text: "go fmt reformatted files — changes have been staged, please re-commit."
     go-vet:
       glob: "*.go"
       run: go vet ./...
+      fail_text: "go vet found issues."
     go-test:
       glob: "*.go"
       run: go test ./...
+      fail_text: "go test failed."

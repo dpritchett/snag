@@ -2,13 +2,25 @@ pre-commit:
   commands:
     blocklist:
       run: snag diff
+      fail_text: >
+        Staged diff contains a blocked pattern.
+        See .blocklist (or parent directories) for the active pattern list.
+        https://github.com/dpritchett/snag
 
 commit-msg:
   commands:
     blocklist:
       run: snag msg {1}
+      fail_text: >
+        Commit message contains a blocked pattern.
+        Matching trailer lines are stripped automatically.
+        To recover your message: git commit -eF .git/COMMIT_EDITMSG
+        https://github.com/dpritchett/snag
 
 pre-push:
   commands:
     blocklist:
       run: snag push
+      fail_text: >
+        Unpushed commits contain a blocked pattern (message or diff).
+        https://github.com/dpritchett/snag

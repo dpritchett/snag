@@ -3,3 +3,6 @@ pre-commit:
     shellcheck:
       glob: "*.sh"
       run: shellcheck {staged_files}
+      fail_text: >
+        shellcheck found issues in staged shell scripts.
+        https://www.shellcheck.net
