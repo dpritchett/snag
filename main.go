@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -37,12 +36,10 @@ func buildRootCmd() *cobra.Command {
 	}
 
 	pushCmd := &cobra.Command{
-		Use:   "push",
-		Short: "Check pre-push policies",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("snag: push not implemented")
-			return nil
-		},
+		Use:          "push",
+		Short:        "Check pre-push policies",
+		SilenceUsage: true,
+		RunE:         runPush,
 	}
 
 	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd)
