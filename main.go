@@ -29,13 +29,11 @@ func buildRootCmd() *cobra.Command {
 	}
 
 	msgCmd := &cobra.Command{
-		Use:   "msg FILE",
-		Short: "Check commit message against policies",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("snag: msg not implemented (would process %s)\n", args[0])
-			return nil
-		},
+		Use:          "msg FILE",
+		Short:        "Check commit message against policies",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE:         runMsg,
 	}
 
 	pushCmd := &cobra.Command{
