@@ -21,7 +21,7 @@ func init() {
 func buildRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:     "snag",
-		Short:   "Composable git hook policy kit",
+		Short:   fmt.Sprintf("snag %s — Composable git hook policy kit", Version),
 		Version: Version,
 	}
 
