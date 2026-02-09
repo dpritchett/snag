@@ -1,12 +1,22 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 )
 
 var Version = "dev"
+
+func init() {
+	if Version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			Version = info.Main.Version
+		}
+	}
+}
 
 func buildRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
@@ -42,7 +52,15 @@ func buildRootCmd() *cobra.Command {
 		RunE:         runPush,
 	}
 
-	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd)
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print version and exit",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("snag version %s\n", Version)
+		},
+	}
+
+	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd, versionCmd)
 	return rootCmd
 }
 
