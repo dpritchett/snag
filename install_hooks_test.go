@@ -154,3 +154,291 @@ remotes:
 		t.Error("file should not have been modified when already at current version")
 	}
 }
+
+func TestInstallHooks_DetectsExistingInLocal(t *testing.T) {
+	dir := t.TempDir()
+	// Shared config exists but has no snag remote.
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+	// Local config has an old snag remote.
+	localContent := `remotes:
+  - git_url: https://github.com/dpritchett/snag.git
+    ref: v0.1.0
+    configs:
+      - recipes/lefthook-blocklist.yml
+`
+	os.WriteFile(filepath.Join(dir, "lefthook-local.yml"), []byte(localContent), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Local config should be updated.
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
+	content := string(data)
+	if strings.Contains(content, "v0.1.0") {
+		t.Error("old ref v0.1.0 should have been replaced in local config")
+	}
+	if !strings.Contains(content, Version) {
+		t.Errorf("expected current version %s in local config", Version)
+	}
+
+	// Shared config should NOT have snag remote added.
+	sharedData, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if strings.Contains(string(sharedData), "github.com/dpritchett/snag") {
+		t.Error("shared config should not have been modified when snag was only in local")
+	}
+}
+
+func TestInstallHooks_DetectsExistingInBoth(t *testing.T) {
+	dir := t.TempDir()
+	sharedContent := `pre-commit:
+  commands:
+    lint:
+      run: echo lint
+remotes:
+  - git_url: https://github.com/dpritchett/snag.git
+    ref: v0.1.0
+    configs:
+      - recipes/lefthook-blocklist.yml
+`
+	localContent := `remotes:
+  - git_url: https://github.com/dpritchett/snag.git
+    ref: v0.2.0
+    configs:
+      - recipes/lefthook-blocklist.yml
+`
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(sharedContent), 0644)
+	os.WriteFile(filepath.Join(dir, "lefthook-local.yml"), []byte(localContent), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Both should be updated.
+	sharedData, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if !strings.Contains(string(sharedData), Version) {
+		t.Errorf("expected current version %s in shared config", Version)
+	}
+	if strings.Contains(string(sharedData), "v0.1.0") {
+		t.Error("old ref should have been replaced in shared config")
+	}
+
+	localData, _ := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
+	if !strings.Contains(string(localData), Version) {
+		t.Errorf("expected current version %s in local config", Version)
+	}
+	if strings.Contains(string(localData), "v0.2.0") {
+		t.Error("old ref should have been replaced in local config")
+	}
+}
+
+func TestInstallHooks_LocalFlag(t *testing.T) {
+	dir := t.TempDir()
+	// Shared config exists.
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+	// Local config exists with some content but no snag.
+	os.WriteFile(filepath.Join(dir, "lefthook-local.yml"), []byte("pre-push:\n  commands:\n    test:\n      run: echo test\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--local"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Local config should have snag remote.
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
+	content := string(data)
+	if !strings.Contains(content, "github.com/dpritchett/snag") {
+		t.Error("expected snag remote in local config")
+	}
+	// Original local content preserved.
+	if !strings.Contains(content, "echo test") {
+		t.Error("original local content was lost")
+	}
+
+	// Shared config should NOT be modified.
+	sharedData, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if strings.Contains(string(sharedData), "github.com/dpritchett/snag") {
+		t.Error("shared config should not have been modified with --local flag")
+	}
+}
+
+func TestInstallHooks_SharedFlag(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--shared"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	content := string(data)
+	if !strings.Contains(content, "github.com/dpritchett/snag") {
+		t.Error("expected snag remote in shared config")
+	}
+}
+
+func TestInstallHooks_LocalFlagCreatesFile(t *testing.T) {
+	dir := t.TempDir()
+	// Shared config exists, but no local config.
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--local"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// lefthook-local.yml should have been created.
+	data, err := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
+	if err != nil {
+		t.Fatalf("expected lefthook-local.yml to be created: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "github.com/dpritchett/snag") {
+		t.Error("expected snag remote in newly created local config")
+	}
+	// Should not have a leading newline (it's a fresh file).
+	if strings.HasPrefix(content, "\n") {
+		t.Error("newly created local config should not start with a blank line")
+	}
+}
+
+func TestInstallHooks_NonTTYDefaultsToShared(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	// Override isTTY to simulate non-TTY.
+	origIsTTY := isTTY
+	isTTY = func() bool { return false }
+	defer func() { isTTY = origIsTTY }()
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have written to shared config.
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if !strings.Contains(string(data), "github.com/dpritchett/snag") {
+		t.Error("expected snag remote in shared config when non-TTY")
+	}
+
+	// Local config should NOT exist.
+	if _, err := os.Stat(filepath.Join(dir, "lefthook-local.yml")); err == nil {
+		t.Error("local config should not have been created in non-TTY mode")
+	}
+}
+
+func TestInstallHooks_DryRunDoesNotWrite(t *testing.T) {
+	dir := t.TempDir()
+	initial := "pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--dry-run"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// File should be unchanged.
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if string(data) != initial {
+		t.Error("--dry-run should not modify the file")
+	}
+}
+
+func TestInstallHooks_DryRunLocalDoesNotCreate(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--local", "--dry-run"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// lefthook-local.yml should NOT have been created.
+	if _, err := os.Stat(filepath.Join(dir, "lefthook-local.yml")); err == nil {
+		t.Error("--dry-run --local should not create the file")
+	}
+}
+
+func TestInstallHooks_DryRunUpdate(t *testing.T) {
+	dir := t.TempDir()
+	initial := `pre-commit:
+  commands:
+    lint:
+      run: echo lint
+remotes:
+  - git_url: https://github.com/dpritchett/snag.git
+    ref: v0.1.0
+    configs:
+      - recipes/lefthook-blocklist.yml
+`
+	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install-hooks", "--dry-run"})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// File should still have the old ref.
+	data, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if !strings.Contains(string(data), "v0.1.0") {
+		t.Error("--dry-run should not update the ref")
+	}
+}
