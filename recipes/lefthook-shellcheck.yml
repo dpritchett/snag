@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    shellcheck:
+      glob: "*.sh"
+      run: shellcheck {staged_files}
