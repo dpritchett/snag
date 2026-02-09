@@ -62,10 +62,13 @@ func buildRootCmd() *cobra.Command {
 
 	installHooksCmd := &cobra.Command{
 		Use:          "install-hooks",
-		Short:        "Add or update snag remote in lefthook.yml",
+		Short:        "Add or update snag remote in lefthook config",
 		SilenceUsage: true,
 		RunE:         runInstallHooks,
 	}
+	installHooksCmd.Flags().Bool("local", false, "install to lefthook-local.yml (gitignored, just for you)")
+	installHooksCmd.Flags().Bool("shared", false, "install to lefthook.yml (checked in, whole team)")
+	installHooksCmd.MarkFlagsMutuallyExclusive("local", "shared")
 
 	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd, versionCmd, installHooksCmd)
 	return rootCmd
