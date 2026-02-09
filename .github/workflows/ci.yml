@@ -18,6 +18,8 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
       - run: go build -o /dev/null .

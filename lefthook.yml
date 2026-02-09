@@ -2,6 +2,15 @@ pre-commit:
   commands:
     blocklist:
       run: go run . diff
+    go-fmt:
+      glob: "*.go"
+      run: gofmt -l . | grep . && exit 1 || true
+    go-vet:
+      glob: "*.go"
+      run: go vet ./...
+    go-test:
+      glob: "*.go"
+      run: go test ./...
 
 commit-msg:
   commands:
