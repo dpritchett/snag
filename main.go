@@ -61,29 +61,16 @@ func buildRootCmd() *cobra.Command {
 		Short: "Run policy checks (diff, msg, push)",
 	}
 
-	diffCmd := &cobra.Command{
-		Use:          "diff",
-		Short:        "Check staged diff against policies",
-		SilenceUsage: true,
-		RunE:         runDiff,
+	for _, h := range hooks {
+		cmd := &cobra.Command{
+			Use:          h.Use,
+			Short:        h.Short,
+			Args:         h.Args,
+			SilenceUsage: true,
+			RunE:         h.RunE,
+		}
+		checkCmd.AddCommand(cmd)
 	}
-
-	msgCmd := &cobra.Command{
-		Use:          "msg FILE",
-		Short:        "Check commit message against policies",
-		Args:         cobra.ExactArgs(1),
-		SilenceUsage: true,
-		RunE:         runMsg,
-	}
-
-	pushCmd := &cobra.Command{
-		Use:          "push",
-		Short:        "Check pre-push policies",
-		SilenceUsage: true,
-		RunE:         runPush,
-	}
-
-	checkCmd.AddCommand(diffCmd, msgCmd, pushCmd)
 
 	versionCmd := &cobra.Command{
 		Use:   "version",

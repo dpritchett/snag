@@ -30,7 +30,8 @@ All production code lives in the package `main` at the repo root.
 
 | File | Purpose |
 |------|---------|
-| `main.go` | Cobra CLI scaffolding, `check` parent command with `diff`/`msg`/`push` subcommands, `install` command, persistent flags (`--blocklist`, `--quiet`), version detection via `runtime/debug.BuildInfo`. Cobra auto-provides `completion` subcommand for fish/bash/zsh |
+| `hooks.go` | `Hook` struct + `hooks` registry slice. Each entry carries the hook's name, cobra metadata, `RunE` check, and `TestFn` scenario. Adding a hook means adding one struct literal — the compiler enforces that every hook has a test |
+| `main.go` | Cobra CLI scaffolding, `check` parent command (subcommands generated from `hooks` registry), `install` command, persistent flags (`--blocklist`, `--quiet`), version detection via `runtime/debug.BuildInfo`. Cobra auto-provides `completion` subcommand for fish/bash/zsh |
 | `blocklist.go` | Core policy engine: `loadBlocklist`, `matchesBlocklist`, `isTrailerLine`, plus `resolvePatterns` (directory walk + env var merge + dedup) |
 | `diff.go` | Pre-commit: runs `git diff --staged`, checks output against blocklist |
 | `msg.go` | Commit-msg: two-pass — strip matching trailer lines then check remaining body |

@@ -49,7 +49,10 @@ func runChecks(cmd *cobra.Command, args []string, patterns []string) error {
 	if len(args) == 1 {
 		which = args[0]
 	}
-	valid := map[string]bool{"all": true, "diff": true, "msg": true, "push": true}
+	valid := map[string]bool{"all": true}
+	for _, h := range hooks {
+		valid[h.Name] = true
+	}
 	if !valid[which] {
 		return fmt.Errorf("unknown check %q (choose diff, msg, or push)", which)
 	}
@@ -79,10 +82,9 @@ func runChecks(cmd *cobra.Command, args []string, patterns []string) error {
 		name string
 		fn   func(*cobra.Command, string, []string) bool
 	}
-	all := []subtest{
-		{"diff", testDiff},
-		{"msg", testMsg},
-		{"push", testPush},
+	var all []subtest
+	for _, h := range hooks {
+		all = append(all, subtest{h.Name, h.TestFn})
 	}
 
 	passed := 0
