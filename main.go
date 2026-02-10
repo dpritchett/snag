@@ -92,7 +92,7 @@ func buildRootCmd() *cobra.Command {
 	installCmd.Flags().BoolP("dry-run", "n", false, "show what would be changed without writing files")
 	installCmd.MarkFlagsMutuallyExclusive("local", "shared")
 
-	rootCmd.AddCommand(checkCmd, versionCmd, installCmd, buildTestCmd(), buildDemoCmd())
+	rootCmd.AddCommand(checkCmd, versionCmd, installCmd, buildInitCmd(), buildTestCmd(), buildDemoCmd())
 	return rootCmd
 }
 

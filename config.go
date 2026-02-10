@@ -13,7 +13,8 @@ import (
 // snagTOML represents the top-level structure of a snag.toml file.
 // Unknown sections are silently ignored (forward compatible).
 type snagTOML struct {
-	Block blockSection `toml:"block"`
+	MinVersion string       `toml:"min_version"`
+	Block      blockSection `toml:"block"`
 }
 
 // blockSection maps each hook phase to its own pattern list.
@@ -59,7 +60,51 @@ func loadSnagTOML(path string) (snagTOML, error) {
 	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parsing %s: %w", path, err)
 	}
+	if cfg.MinVersion != "" {
+		if err := checkMinVersion(cfg.MinVersion, path); err != nil {
+			return cfg, err
+		}
+	}
 	return cfg, nil
+}
+
+// checkMinVersion compares the min_version field against the running snag version.
+// Returns an error if the running version is too old. Dev builds always pass.
+func checkMinVersion(minVer, path string) error {
+	cur := Version
+	if cur == "dev" || strings.HasPrefix(cur, "dev+") {
+		return nil
+	}
+	cur = strings.TrimPrefix(cur, "v")
+	minVer = strings.TrimPrefix(minVer, "v")
+	if compareSemver(cur, minVer) < 0 {
+		return fmt.Errorf("%s requires snag >= %s (running %s)", path, minVer, Version)
+	}
+	return nil
+}
+
+// compareSemver compares two semver strings (major.minor.patch).
+// Returns -1 if a < b, 0 if equal, 1 if a > b.
+// Non-numeric or missing parts are treated as 0.
+func compareSemver(a, b string) int {
+	aParts := strings.SplitN(a, ".", 3)
+	bParts := strings.SplitN(b, ".", 3)
+	for i := 0; i < 3; i++ {
+		av, bv := 0, 0
+		if i < len(aParts) {
+			fmt.Sscanf(aParts[i], "%d", &av)
+		}
+		if i < len(bParts) {
+			fmt.Sscanf(bParts[i], "%d", &bv)
+		}
+		if av < bv {
+			return -1
+		}
+		if av > bv {
+			return 1
+		}
+	}
+	return 0
 }
 
 // configKind tracks which config file type was found during a walk.
