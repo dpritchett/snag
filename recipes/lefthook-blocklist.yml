@@ -42,3 +42,12 @@ prepare-commit-msg:
         Auto-generated commit message contains a blocked pattern.
         Use: git commit -m "your message" or git commit -e
         https://github.com/dpritchett/snag
+
+pre-rebase:
+  commands:
+    snag-branch-guard:
+      run: snag check rebase {1} {2}
+      fail_text: >
+        Rebase blocked — target is a protected branch.
+        To override: SNAG_ALLOW_REBASE=1 git rebase ...
+        https://github.com/dpritchett/snag

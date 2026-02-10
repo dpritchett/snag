@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 ## What is snag?
 
-A composable git hook policy kit written in Go. It enforces content policies (via a `.blocklist` file) across five git hook phases: pre-commit (`check diff`), commit-msg (`check msg`), pre-push (`check push`), post-checkout (`check checkout`), and prepare-commit-msg (`check prepare`). It ships both a Go CLI and reusable lefthook recipe files in `recipes/`.
+A composable git hook policy kit written in Go. It enforces content policies (via a `.blocklist` file) across six git hook phases: pre-commit (`check diff`), commit-msg (`check msg`), pre-push (`check push`), post-checkout (`check checkout`), prepare-commit-msg (`check prepare`), and pre-rebase (`check rebase`). It ships both a Go CLI and reusable lefthook recipe files in `recipes/`.
 
 Design philosophy: minimal configuration surface. The `.blocklist` file and optional `SNAG_BLOCKLIST` env var are the entire policy interface. snag ships no default patterns — that's a policy decision, not a tool decision.
 
@@ -38,6 +38,7 @@ All production code lives in the package `main` at the repo root.
 | `push.go` | Pre-push: scans commit messages AND diffs for all unpushed commits (`@{upstream}..HEAD`) |
 | `checkout.go` | Post-checkout: warns when a repo has a `.blocklist` but snag hooks aren't installed. Checks lefthook configs for snag remote and `.git/hooks/` for snag scripts |
 | `prepare.go` | Prepare-commit-msg: checks auto-generated commit messages (merge, template, amend) against blocklist. Skips `-m` messages (commit-msg handles those) |
+| `rebase.go` | Pre-rebase: blocks rebase of protected branches (main, master by default). Override via `SNAG_PROTECTED_BRANCHES` env var |
 | `install_hooks.go` | `snag install` — adds/updates snag remote in lefthook config. Reads YAML to understand structure, writes via string append/replace to preserve formatting |
 
 **Data flow:** git hook → `snag check <subcommand>` → `resolvePatterns` (walk up for `.blocklist` files + `SNAG_BLOCKLIST` env var) → shell out to git → pattern match → exit code (0 = clean, 1 = violation).

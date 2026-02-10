@@ -4,7 +4,7 @@ import "github.com/spf13/cobra"
 
 // Hook describes a single policy check that snag can run.
 type Hook struct {
-	Name   string                                      // "diff", "msg", "push", "checkout", "prepare"
+	Name   string                                      // "diff", "msg", "push", "checkout", "prepare", "rebase"
 	Use    string                                      // cobra Use string
 	Short  string                                      // cobra Short description
 	Args   cobra.PositionalArgs                        // nil = no positional args
@@ -49,6 +49,14 @@ var hooks = []Hook{
 		Args:   cobra.RangeArgs(1, 3),
 		RunE:   runPrepare,
 		TestFn: testPrepare,
+	},
+	{
+		Name:   "rebase",
+		Use:    "rebase [UPSTREAM] [BRANCH]",
+		Short:  "Block rebase of protected branches (pre-rebase)",
+		Args:   cobra.RangeArgs(0, 2),
+		RunE:   runRebase,
+		TestFn: testRebase,
 	},
 }
 
