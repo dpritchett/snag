@@ -176,19 +176,30 @@ func walkConfigSources() ([]configSource, error) {
 
 	for {
 		tomlPath := filepath.Join(current, "snag.toml")
+		localPath := filepath.Join(current, "snag-local.toml")
 		blPath := filepath.Join(current, ".blocklist")
 
 		tomlExists := fileExists(tomlPath)
+		localExists := fileExists(localPath)
 		blExists := fileExists(blPath)
 
 		switch kind {
 		case configNone:
-			if tomlExists {
+			if tomlExists || localExists {
 				kind = configTOML
-				if src, err := tomlSource(tomlPath); err != nil {
-					return nil, err
-				} else if src != nil {
-					sources = append(sources, *src)
+				if tomlExists {
+					if src, err := tomlSource(tomlPath); err != nil {
+						return nil, err
+					} else if src != nil {
+						sources = append(sources, *src)
+					}
+				}
+				if localExists {
+					if src, err := tomlSource(localPath); err != nil {
+						return nil, err
+					} else if src != nil {
+						sources = append(sources, *src)
+					}
 				}
 			} else if blExists {
 				kind = configBlocklist
@@ -201,6 +212,13 @@ func walkConfigSources() ([]configSource, error) {
 		case configTOML:
 			if tomlExists {
 				if src, err := tomlSource(tomlPath); err != nil {
+					return nil, err
+				} else if src != nil {
+					sources = append(sources, *src)
+				}
+			}
+			if localExists {
+				if src, err := tomlSource(localPath); err != nil {
 					return nil, err
 				} else if src != nil {
 					sources = append(sources, *src)

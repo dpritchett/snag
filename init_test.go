@@ -108,6 +108,78 @@ func TestRunInit(t *testing.T) {
 	})
 }
 
+func TestRunInitLocal(t *testing.T) {
+	makeCmd := func() *cobra.Command {
+		cmd := buildInitCmd()
+		cmd.PersistentFlags().String("blocklist", ".blocklist", "")
+		cmd.PersistentFlags().BoolP("quiet", "q", true, "")
+		return cmd
+	}
+
+	t.Run("creates default snag-local.toml", func(t *testing.T) {
+		dir := t.TempDir()
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		cmd := makeCmd()
+		cmd.Flags().Set("local", "true")
+		if err := cmd.RunE(cmd, nil); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		data, err := os.ReadFile(filepath.Join(dir, "snag-local.toml"))
+		if err != nil {
+			t.Fatalf("snag-local.toml not created: %v", err)
+		}
+		content := string(data)
+		if !strings.Contains(content, "gitignored") {
+			t.Error("missing gitignore comment")
+		}
+	})
+
+	t.Run("imports .blocklist into local", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("secretword\nforbidden\n"), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		cmd := makeCmd()
+		cmd.Flags().Set("local", "true")
+		if err := cmd.RunE(cmd, nil); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		data, _ := os.ReadFile(filepath.Join(dir, "snag-local.toml"))
+		content := string(data)
+		if !strings.Contains(content, "secretword") {
+			t.Error("should contain patterns from .blocklist")
+		}
+		// Local should NOT have branch patterns
+		if strings.Contains(content, "branch") {
+			t.Error("local config should not include branch patterns")
+		}
+	})
+
+	t.Run("refuses to overwrite local without --force", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag-local.toml"), []byte("existing"), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		cmd := makeCmd()
+		cmd.Flags().Set("local", "true")
+		err := cmd.RunE(cmd, nil)
+		if err == nil {
+			t.Fatal("expected error when snag-local.toml exists")
+		}
+	})
+}
+
 func TestBuildTOMLFromBlocklist(t *testing.T) {
 	got := buildTOMLFromBlocklist([]string{"secret", "password"})
 	if !strings.Contains(got, `"secret"`) {

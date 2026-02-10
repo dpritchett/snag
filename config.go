@@ -117,10 +117,12 @@ const (
 )
 
 // walkConfig performs a single-pass walk from dir up to the filesystem root,
-// checking for snag.toml and .blocklist at each level. The first file type
-// found sets the mode for the entire walk. snag.toml takes priority over
-// .blocklist when both exist at the same directory level. Returns the
-// resolved BlockConfig, whether any config was found, and any error.
+// checking for snag.toml, snag-local.toml, and .blocklist at each level.
+// The first file type found (TOML or .blocklist) sets the mode for the
+// entire walk. snag.toml takes priority over .blocklist when both exist
+// at the same directory level. snag-local.toml is always merged alongside
+// snag.toml (additive, never overrides). Returns the resolved BlockConfig,
+// whether any config was found, and any error.
 func walkConfig(dir string) (*BlockConfig, bool, error) {
 	bc := &BlockConfig{}
 	kind := configNone
@@ -129,18 +131,27 @@ func walkConfig(dir string) (*BlockConfig, bool, error) {
 
 	for {
 		tomlPath := filepath.Join(current, "snag.toml")
+		localPath := filepath.Join(current, "snag-local.toml")
 		blPath := filepath.Join(current, ".blocklist")
 
 		tomlExists := fileExists(tomlPath)
+		localExists := fileExists(localPath)
 		blExists := fileExists(blPath)
 
 		switch kind {
 		case configNone:
 			// Haven't found any config yet — check both, prefer TOML.
-			if tomlExists {
+			if tomlExists || localExists {
 				kind = configTOML
-				if err := mergeTOML(bc, tomlPath); err != nil {
-					return nil, false, err
+				if tomlExists {
+					if err := mergeTOML(bc, tomlPath); err != nil {
+						return nil, false, err
+					}
+				}
+				if localExists {
+					if err := mergeTOML(bc, localPath); err != nil {
+						return nil, false, err
+					}
 				}
 				found = true
 			} else if blExists {
@@ -151,9 +162,14 @@ func walkConfig(dir string) (*BlockConfig, bool, error) {
 				found = true
 			}
 		case configTOML:
-			// Already in TOML mode — only look at snag.toml files.
+			// Already in TOML mode — look at snag.toml and snag-local.toml.
 			if tomlExists {
 				if err := mergeTOML(bc, tomlPath); err != nil {
+					return nil, false, err
+				}
+			}
+			if localExists {
+				if err := mergeTOML(bc, localPath); err != nil {
 					return nil, false, err
 				}
 			}

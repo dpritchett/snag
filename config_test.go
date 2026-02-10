@@ -170,6 +170,49 @@ branch = ["release/*"]
 		}
 	})
 
+	t.Run("snag-local.toml merges with snag.toml", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[block]
+diff = ["TEAM-PATTERN"]
+branch = ["main"]
+`), 0644)
+		os.WriteFile(filepath.Join(dir, "snag-local.toml"), []byte(`
+[block]
+diff = ["PERSONAL-SECRET"]
+`), 0644)
+
+		bc, found, err := walkConfig(dir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !found {
+			t.Fatal("expected found=true")
+		}
+		if len(bc.Diff) != 2 {
+			t.Errorf("diff: got %v, want 2 patterns (team + personal)", bc.Diff)
+		}
+	})
+
+	t.Run("snag-local.toml alone triggers TOML mode", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag-local.toml"), []byte(`
+[block]
+diff = ["LOCAL-ONLY"]
+`), 0644)
+
+		bc, found, err := walkConfig(dir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !found {
+			t.Fatal("expected found=true")
+		}
+		if len(bc.Diff) != 1 || bc.Diff[0] != "LOCAL-ONLY" {
+			t.Errorf("diff: got %v, want [LOCAL-ONLY]", bc.Diff)
+		}
+	})
+
 	t.Run("no config anywhere", func(t *testing.T) {
 		dir := t.TempDir()
 		bc, found, err := walkConfig(dir)
