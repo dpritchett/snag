@@ -30,7 +30,7 @@ All production code lives in the package `main` at the repo root.
 
 | File | Purpose |
 |------|---------|
-| `main.go` | Cobra CLI scaffolding, `check` parent command with `diff`/`msg`/`push` subcommands, `install` command, persistent flags (`--blocklist`, `--quiet`), version detection via `runtime/debug.BuildInfo` |
+| `main.go` | Cobra CLI scaffolding, `check` parent command with `diff`/`msg`/`push` subcommands, `install` command, persistent flags (`--blocklist`, `--quiet`), version detection via `runtime/debug.BuildInfo`. Cobra auto-provides `completion` subcommand for fish/bash/zsh |
 | `blocklist.go` | Core policy engine: `loadBlocklist`, `matchesBlocklist`, `isTrailerLine`, plus `resolvePatterns` (directory walk + env var merge + dedup) |
 | `diff.go` | Pre-commit: runs `git diff --staged`, checks output against blocklist |
 | `msg.go` | Commit-msg: two-pass — strip matching trailer lines then check remaining body |

@@ -218,6 +218,26 @@ do not merge"
 directory walk (or explicit `--blocklist`) found. Handy for CI, shell rc files,
 direnv, or mise.
 
+### Shell completions
+
+snag ships tab completion for fish, bash, and zsh:
+
+```bash
+# fish
+snag completion fish > ~/.config/fish/completions/snag.fish
+
+# bash (macOS)
+snag completion bash > $(brew --prefix)/etc/bash_completion.d/snag
+
+# bash (Linux)
+snag completion bash > /etc/bash_completion.d/snag
+
+# zsh
+snag completion zsh > "${fpath[1]}/_snag"
+```
+
+Restart your shell (or `source` the file) to activate.
+
 ## `.blocklist` file format
 
 ```
