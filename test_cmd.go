@@ -10,38 +10,48 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cannedPatterns = []string{"todo", "fixme", "password"}
+var demoPatterns = []string{"todo", "fixme", "password"}
 
-func buildTestCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:          "test [diff|msg|push]",
-		Short:        "Dry-run hooks against a temp repo to verify output",
+func buildDemoCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "demo [diff|msg|push]",
+		Short:        "Showcase all hook checks with canned demo patterns",
 		SilenceUsage: true,
 		Args:         cobra.MaximumNArgs(1),
-		RunE:         runTest,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runChecks(cmd, args, demoPatterns)
+		},
 	}
-	return cmd
 }
 
-func runTest(cmd *cobra.Command, args []string) error {
-	// Decide which sub-tests to run.
+func buildTestCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "test [diff|msg|push]",
+		Short:        "Smoke-test hooks using your real blocklist config",
+		SilenceUsage: true,
+		Args:         cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			patterns, err := resolvePatterns(cmd)
+			if err != nil {
+				return err
+			}
+			if len(patterns) == 0 {
+				infof("nothing to test — no patterns found in .blocklist or SNAG_BLOCKLIST")
+				return nil
+			}
+			return runChecks(cmd, args, patterns)
+		},
+	}
+}
+
+func runChecks(cmd *cobra.Command, args []string, patterns []string) error {
 	which := "all"
 	if len(args) == 1 {
 		which = args[0]
 	}
 	valid := map[string]bool{"all": true, "diff": true, "msg": true, "push": true}
 	if !valid[which] {
-		return fmt.Errorf("unknown test %q (choose diff, msg, or push)", which)
-	}
-
-	// Resolve patterns: real blocklist first, canned fallback.
-	patterns, err := resolvePatterns(cmd)
-	if err != nil {
-		return err
-	}
-	if len(patterns) == 0 {
-		patterns = cannedPatterns
-		infof("no blocklist found, using demo patterns")
+		return fmt.Errorf("unknown check %q (choose diff, msg, or push)", which)
 	}
 
 	quiet, _ := cmd.Flags().GetBool("quiet")
