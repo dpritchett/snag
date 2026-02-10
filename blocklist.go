@@ -141,6 +141,51 @@ func resolvePatterns(cmd *cobra.Command) ([]string, error) {
 	return deduplicatePatterns(patterns), nil
 }
 
+// stripDiffMeta removes unified diff metadata lines (headers, index,
+// hunk markers) so only actual content is checked for policy violations.
+// This prevents filenames in diff headers from triggering false positives.
+func stripDiffMeta(diff string) string {
+	var content []string
+	for _, line := range strings.Split(diff, "\n") {
+		if isDiffMeta(line) {
+			continue
+		}
+		content = append(content, line)
+	}
+	return strings.Join(content, "\n")
+}
+
+func isDiffMeta(line string) bool {
+	switch {
+	case strings.HasPrefix(line, "diff --git "):
+		return true
+	case strings.HasPrefix(line, "--- a/"), line == "--- /dev/null":
+		return true
+	case strings.HasPrefix(line, "+++ b/"), line == "+++ /dev/null":
+		return true
+	case strings.HasPrefix(line, "rename from "),
+		strings.HasPrefix(line, "rename to "),
+		strings.HasPrefix(line, "copy from "),
+		strings.HasPrefix(line, "copy to "):
+		return true
+	case strings.HasPrefix(line, "index "):
+		return true
+	case strings.HasPrefix(line, "@@ "):
+		return true
+	case strings.HasPrefix(line, "old mode "),
+		strings.HasPrefix(line, "new mode "),
+		strings.HasPrefix(line, "new file mode "),
+		strings.HasPrefix(line, "deleted file mode "):
+		return true
+	case strings.HasPrefix(line, "similarity index "),
+		strings.HasPrefix(line, "dissimilarity index "):
+		return true
+	case strings.HasPrefix(line, "Binary files "):
+		return true
+	}
+	return false
+}
+
 // isTrailerLine reports whether line is a valid Git trailer (Key: Value).
 // The key must have no spaces, no leading whitespace, and be followed by ": ".
 func isTrailerLine(line string) bool {

@@ -12,24 +12,6 @@ import (
 
 var defaultProtectedBranches = []string{"main", "master"}
 
-// protectedBranches returns the list of branch patterns that should not be rebased.
-// Override via SNAG_PROTECTED_BRANCHES (comma-separated, supports globs like release/*).
-func protectedBranches() []string {
-	if env := os.Getenv("SNAG_PROTECTED_BRANCHES"); env != "" {
-		var out []string
-		for _, s := range strings.Split(env, ",") {
-			s = strings.TrimSpace(s)
-			if s != "" {
-				out = append(out, s)
-			}
-		}
-		if len(out) > 0 {
-			return out
-		}
-	}
-	return defaultProtectedBranches
-}
-
 // currentBranch returns the short name of HEAD via git symbolic-ref.
 func currentBranch() (string, error) {
 	out, err := exec.Command("git", "symbolic-ref", "--short", "HEAD").CombinedOutput()
@@ -69,7 +51,12 @@ func runRebase(cmd *cobra.Command, args []string) error {
 		branch = b
 	}
 
-	patterns := protectedBranches()
+	bc, err := resolveBlockConfig(cmd)
+	if err != nil {
+		return err
+	}
+	patterns := bc.Branch
+
 	if !isProtected(branch, patterns) {
 		return nil
 	}

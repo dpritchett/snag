@@ -42,11 +42,11 @@ func snagHooksInstalled() bool {
 
 func runCheckout(cmd *cobra.Command, args []string) error {
 	// If no patterns exist, nothing to protect — skip silently.
-	patterns, err := resolvePatterns(cmd)
+	bc, err := resolveBlockConfig(cmd)
 	if err != nil {
 		return err
 	}
-	if len(patterns) == 0 {
+	if !bc.HasAnyPatterns() {
 		return nil
 	}
 
@@ -56,7 +56,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	if !quiet {
-		warnf("this repo has a .blocklist but snag hooks aren't installed")
+		warnf("this repo has a snag config but snag hooks aren't installed")
 		hintf("run: snag install && lefthook install")
 	}
 	return fmt.Errorf("snag hooks not installed")

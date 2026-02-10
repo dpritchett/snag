@@ -34,10 +34,11 @@ func unpushedCommits(revRange string) ([]string, error) {
 }
 
 func runPush(cmd *cobra.Command, args []string) error {
-	patterns, err := resolvePatterns(cmd)
+	bc, err := resolveBlockConfig(cmd)
 	if err != nil {
 		return err
 	}
+	patterns := bc.PushPatterns()
 	if len(patterns) == 0 {
 		return nil
 	}
@@ -78,7 +79,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("git diff-tree %s: %w\n%s", short, err, diffOut)
 		}
-		if pattern, found := matchesBlocklist(string(diffOut), patterns); found {
+		if pattern, found := matchesBlocklist(stripDiffMeta(string(diffOut)), patterns); found {
 			if !quiet {
 				errorf("match %q in diff of %s", pattern, short)
 				bell()

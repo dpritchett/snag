@@ -208,6 +208,62 @@ func TestMatchesBlocklist(t *testing.T) {
 	}
 }
 
+func TestStripDiffMeta(t *testing.T) {
+	t.Run("strips all metadata, keeps content", func(t *testing.T) {
+		diff := `diff --git a/secret.env b/secret.env
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/secret.env
+@@ -0,0 +1,2 @@
++API_KEY=hunter2
++DB_HOST=localhost`
+
+		got := stripDiffMeta(diff)
+		if _, found := matchesBlocklist(got, []string{"secret.env"}); found {
+			t.Error("filename should have been stripped from diff metadata")
+		}
+		if _, found := matchesBlocklist(got, []string{"hunter2"}); !found {
+			t.Error("content line should still be present")
+		}
+	})
+
+	t.Run("strips rename headers", func(t *testing.T) {
+		diff := `diff --git a/old.env b/new.env
+similarity index 100%
+rename from old.env
+rename to new.env`
+
+		got := stripDiffMeta(diff)
+		if _, found := matchesBlocklist(got, []string{"old.env"}); found {
+			t.Error("rename from filename should be stripped")
+		}
+		if _, found := matchesBlocklist(got, []string{"new.env"}); found {
+			t.Error("rename to filename should be stripped")
+		}
+	})
+
+	t.Run("preserves added and removed lines", func(t *testing.T) {
+		diff := `diff --git a/f b/f
+--- a/f
++++ b/f
+@@ -1 +1 @@
+-old password here
++new password here`
+
+		got := stripDiffMeta(diff)
+		if _, found := matchesBlocklist(got, []string{"password"}); !found {
+			t.Error("content with 'password' should be preserved")
+		}
+	})
+
+	t.Run("empty input", func(t *testing.T) {
+		if got := stripDiffMeta(""); got != "" {
+			t.Errorf("expected empty, got %q", got)
+		}
+	})
+}
+
 func TestIsTrailerLine(t *testing.T) {
 	tests := []struct {
 		name string

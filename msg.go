@@ -26,11 +26,11 @@ func stripTrailers(lines []string, patterns []string) ([]string, int) {
 }
 
 func runMsg(cmd *cobra.Command, args []string) error {
-	patterns, err := resolvePatterns(cmd)
+	bc, err := resolveBlockConfig(cmd)
 	if err != nil {
 		return err
 	}
-	if len(patterns) == 0 {
+	if len(bc.Msg) == 0 {
 		return nil
 	}
 
@@ -43,7 +43,7 @@ func runMsg(cmd *cobra.Command, args []string) error {
 
 	// Pass 1: strip matching trailers
 	lines := strings.Split(string(data), "\n")
-	filtered, removed := stripTrailers(lines, patterns)
+	filtered, removed := stripTrailers(lines, bc.Msg)
 	if removed > 0 {
 		if err := os.WriteFile(args[0], []byte(strings.Join(filtered, "\n")), 0644); err != nil {
 			return fmt.Errorf("rewriting commit message: %w", err)
@@ -55,7 +55,7 @@ func runMsg(cmd *cobra.Command, args []string) error {
 
 	// Pass 2: check remaining body for policy violations
 	body := strings.Join(filtered, "\n")
-	pattern, found := matchesBlocklist(body, patterns)
+	pattern, found := matchesBlocklist(body, bc.Msg)
 	if !found {
 		return nil
 	}

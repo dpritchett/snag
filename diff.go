@@ -8,11 +8,11 @@ import (
 )
 
 func runDiff(cmd *cobra.Command, args []string) error {
-	patterns, err := resolvePatterns(cmd)
+	bc, err := resolveBlockConfig(cmd)
 	if err != nil {
 		return err
 	}
-	if len(patterns) == 0 {
+	if len(bc.Diff) == 0 {
 		return nil
 	}
 
@@ -21,7 +21,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("git diff --staged: %w\n%s", err, out)
 	}
 
-	pattern, found := matchesBlocklist(string(out), patterns)
+	pattern, found := matchesBlocklist(stripDiffMeta(string(out)), bc.Diff)
 	if !found {
 		return nil
 	}

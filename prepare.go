@@ -18,11 +18,11 @@ func runPrepare(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	patterns, err := resolvePatterns(cmd)
+	bc, err := resolveBlockConfig(cmd)
 	if err != nil {
 		return err
 	}
-	if len(patterns) == 0 {
+	if len(bc.Msg) == 0 {
 		return nil
 	}
 
@@ -39,7 +39,7 @@ func runPrepare(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pattern, found := matchesBlocklist(strings.Join(body, "\n"), patterns)
+	pattern, found := matchesBlocklist(strings.Join(body, "\n"), bc.Msg)
 	if !found {
 		return nil
 	}
