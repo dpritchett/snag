@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -58,7 +59,7 @@ func buildRootCmd() *cobra.Command {
 
 	checkCmd := &cobra.Command{
 		Use:   "check",
-		Short: "Run policy checks (diff, msg, push)",
+		Short: fmt.Sprintf("Run policy checks (%s)", strings.Join(hookNames(), ", ")),
 	}
 
 	for _, h := range hooks {

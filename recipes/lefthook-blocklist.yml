@@ -24,3 +24,12 @@ pre-push:
       fail_text: >
         Unpushed commits contain a blocked pattern (message or diff).
         https://github.com/dpritchett/snag
+
+post-checkout:
+  commands:
+    snag-setup-check:
+      run: snag check checkout
+      fail_text: >
+        This repo has a .blocklist but snag hooks aren't installed.
+        Run: snag install && lefthook install
+        https://github.com/dpritchett/snag

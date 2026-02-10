@@ -14,7 +14,7 @@ var demoPatterns = []string{"todo", "fixme", "password"}
 
 func buildDemoCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "demo [diff|msg|push]",
+		Use:          fmt.Sprintf("demo [%s]", strings.Join(hookNames(), "|")),
 		Short:        "Showcase all hook checks with canned demo patterns",
 		SilenceUsage: true,
 		Args:         cobra.MaximumNArgs(1),
@@ -26,7 +26,7 @@ func buildDemoCmd() *cobra.Command {
 
 func buildTestCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "test [diff|msg|push]",
+		Use:          fmt.Sprintf("test [%s]", strings.Join(hookNames(), "|")),
 		Short:        "Smoke-test hooks using your real blocklist config",
 		SilenceUsage: true,
 		Args:         cobra.MaximumNArgs(1),
@@ -54,7 +54,7 @@ func runChecks(cmd *cobra.Command, args []string, patterns []string) error {
 		valid[h.Name] = true
 	}
 	if !valid[which] {
-		return fmt.Errorf("unknown check %q (choose diff, msg, or push)", which)
+		return fmt.Errorf("unknown check %q (choose %s)", which, strings.Join(hookNames(), ", "))
 	}
 
 	quiet, _ := cmd.Flags().GetBool("quiet")

@@ -4,7 +4,7 @@ import "github.com/spf13/cobra"
 
 // Hook describes a single policy check that snag can run.
 type Hook struct {
-	Name   string                                      // "diff", "msg", "push"
+	Name   string                                      // "diff", "msg", "push", "checkout"
 	Use    string                                      // cobra Use string
 	Short  string                                      // cobra Short description
 	Args   cobra.PositionalArgs                        // nil = no positional args
@@ -35,4 +35,20 @@ var hooks = []Hook{
 		RunE:   runPush,
 		TestFn: testPush,
 	},
+	{
+		Name:   "checkout",
+		Use:    "checkout",
+		Short:  "Warn if hooks aren't installed (post-checkout)",
+		RunE:   runCheckout,
+		TestFn: testCheckout,
+	},
+}
+
+// hookNames returns the Name field of every registered hook.
+func hookNames() []string {
+	names := make([]string, len(hooks))
+	for i, h := range hooks {
+		names[i] = h.Name
+	}
+	return names
 }
