@@ -33,3 +33,11 @@ post-checkout:
         This repo has a .blocklist but snag hooks aren't installed.
         Run: snag install && lefthook install
         https://github.com/dpritchett/snag
+
+prepare-commit-msg:
+  commands:
+    snag-ticket-inject:
+      run: snag check prepare {1} {2} {3}
+      fail_text: >
+        Failed to prepend ticket number from branch name.
+        https://github.com/dpritchett/snag

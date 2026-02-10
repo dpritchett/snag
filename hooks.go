@@ -4,7 +4,7 @@ import "github.com/spf13/cobra"
 
 // Hook describes a single policy check that snag can run.
 type Hook struct {
-	Name   string                                      // "diff", "msg", "push", "checkout"
+	Name   string                                      // "diff", "msg", "push", "checkout", "prepare"
 	Use    string                                      // cobra Use string
 	Short  string                                      // cobra Short description
 	Args   cobra.PositionalArgs                        // nil = no positional args
@@ -41,6 +41,14 @@ var hooks = []Hook{
 		Short:  "Warn if hooks aren't installed (post-checkout)",
 		RunE:   runCheckout,
 		TestFn: testCheckout,
+	},
+	{
+		Name:   "prepare",
+		Use:    "prepare FILE [SOURCE] [SHA]",
+		Short:  "Prepend ticket number from branch name (prepare-commit-msg)",
+		Args:   cobra.RangeArgs(1, 3),
+		RunE:   runPrepare,
+		TestFn: testPrepare,
 	},
 }
 
