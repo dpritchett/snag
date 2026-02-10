@@ -56,6 +56,11 @@ func buildRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().String("blocklist", ".blocklist", "path to blocklist file")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "suppress non-error output")
 
+	checkCmd := &cobra.Command{
+		Use:   "check",
+		Short: "Run policy checks (diff, msg, push)",
+	}
+
 	diffCmd := &cobra.Command{
 		Use:          "diff",
 		Short:        "Check staged diff against policies",
@@ -78,6 +83,8 @@ func buildRootCmd() *cobra.Command {
 		RunE:         runPush,
 	}
 
+	checkCmd.AddCommand(diffCmd, msgCmd, pushCmd)
+
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version and exit",
@@ -86,18 +93,18 @@ func buildRootCmd() *cobra.Command {
 		},
 	}
 
-	installHooksCmd := &cobra.Command{
-		Use:          "install-hooks",
+	installCmd := &cobra.Command{
+		Use:          "install",
 		Short:        "Add or update snag remote in lefthook config",
 		SilenceUsage: true,
 		RunE:         runInstallHooks,
 	}
-	installHooksCmd.Flags().Bool("local", false, "install to lefthook-local.yml (gitignored, just for you)")
-	installHooksCmd.Flags().Bool("shared", false, "install to lefthook.yml (checked in, whole team)")
-	installHooksCmd.Flags().BoolP("dry-run", "n", false, "show what would be changed without writing files")
-	installHooksCmd.MarkFlagsMutuallyExclusive("local", "shared")
+	installCmd.Flags().Bool("local", false, "install to lefthook-local.yml (gitignored, just for you)")
+	installCmd.Flags().Bool("shared", false, "install to lefthook.yml (checked in, whole team)")
+	installCmd.Flags().BoolP("dry-run", "n", false, "show what would be changed without writing files")
+	installCmd.MarkFlagsMutuallyExclusive("local", "shared")
 
-	rootCmd.AddCommand(diffCmd, msgCmd, pushCmd, versionCmd, installHooksCmd, buildTestCmd(), buildDemoCmd())
+	rootCmd.AddCommand(checkCmd, versionCmd, installCmd, buildTestCmd(), buildDemoCmd())
 	return rootCmd
 }
 

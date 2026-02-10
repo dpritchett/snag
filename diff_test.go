@@ -68,7 +68,7 @@ func TestRunDiff_MissingBlocklist(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"diff", "--blocklist", filepath.Join(dir, "no-such-file")})
+	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", filepath.Join(dir, "no-such-file")})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for missing blocklist, got: %v", err)
@@ -89,7 +89,7 @@ func TestRunDiff_CleanDiff(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"diff", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", blPath})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for clean diff, got: %v", err)
@@ -124,7 +124,7 @@ func TestRunDiff_WalkFindsParentBlocklist(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"diff"}) // no --blocklist flag
+	rootCmd.SetArgs([]string{"check", "diff"}) // no --blocklist flag
 	err := rootCmd.Execute()
 	if err == nil {
 		t.Fatal("expected error from parent blocklist match")
@@ -149,7 +149,7 @@ func TestRunDiff_EnvVarAddsPatterns(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"diff"}) // no --blocklist, walk + env
+	rootCmd.SetArgs([]string{"check", "diff"}) // no --blocklist, walk + env
 	err := rootCmd.Execute()
 	if err == nil {
 		t.Fatal("expected error from env var pattern match")
@@ -192,7 +192,7 @@ func TestRunDiff_ExplicitFlagSkipsWalk(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"diff", "--blocklist", childBl}) // explicit flag
+	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", childBl}) // explicit flag
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected no error (parent blocklist should be skipped), got: %v", err)
@@ -213,7 +213,7 @@ func TestRunDiff_MatchFound(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"diff", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", blPath})
 
 	// Capture stderr
 	oldStderr := os.Stderr

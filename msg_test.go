@@ -67,7 +67,7 @@ func TestRunMsg_MissingBlocklist(t *testing.T) {
 	os.WriteFile(msgFile, []byte("fix bug\n"), 0644)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"msg", "--blocklist", filepath.Join(dir, "no-such-file"), msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", filepath.Join(dir, "no-such-file"), msgFile})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for missing blocklist, got: %v", err)
@@ -89,7 +89,7 @@ func TestRunMsg_CleanMessage(t *testing.T) {
 	os.WriteFile(msgFile, []byte("fix bug\n"), 0644)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for clean message, got: %v", err)
@@ -110,7 +110,7 @@ func TestRunMsg_TrailerStripped(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -147,7 +147,7 @@ func TestRunMsg_TrailerStrippedThenBodyMatch(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -194,7 +194,7 @@ func TestRunMsg_BodyMatch(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
 	err := rootCmd.Execute()
 
 	w.Close()

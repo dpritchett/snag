@@ -2,7 +2,7 @@ pre-commit:
   parallel: true
   commands:
     blocklist:
-      run: snag diff
+      run: snag check diff
     go-fmt:
       glob: "*.go"
       run: gofmt -l . | grep . && exit 1 || true
@@ -16,9 +16,9 @@ pre-commit:
 commit-msg:
   commands:
     blocklist:
-      run: snag msg {1}
+      run: snag check msg {1}
 
 pre-push:
   commands:
     blocklist:
-      run: snag push
+      run: snag check push

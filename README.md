@@ -54,7 +54,7 @@ just point your lefthook remotes at this repo.
 If you already have a lefthook config, the fastest path is:
 
 ```bash
-snag install-hooks   # adds the snag remote to your lefthook config
+snag install         # adds the snag remote to your lefthook config
 lefthook install     # activates the hooks
 ```
 
@@ -125,10 +125,10 @@ remotes:
 ## CLI usage
 
 ```
-snag diff              # pre-commit: scan staged changes
-snag msg FILE          # commit-msg: clean trailers, reject body matches
-snag push              # pre-push: scan all unpushed commits
-snag install-hooks     # add/update snag remote in lefthook config
+snag check diff        # pre-commit: scan staged changes
+snag check msg FILE    # commit-msg: clean trailers, reject body matches
+snag check push        # pre-push: scan all unpushed commits
+snag install           # add/update snag remote in lefthook config
 snag version           # print version and exit
 ```
 
@@ -141,14 +141,14 @@ blocklist protects every repo underneath it — no per-repo setup required.
 
 If `--blocklist` is passed explicitly, only that file is used (no walk).
 
-### `snag install-hooks`
+### `snag install`
 
 Adds or updates the snag remote in your lefthook config. Finds
 `lefthook.yml`, `lefthook.yaml`, `.lefthook.yml`, or `.lefthook.yaml`.
 Pins the `ref` to the running binary's version.
 
 ```
-$ snag install-hooks
+$ snag install
 Added snag v0.4.3 remote to lefthook.yaml
 Run `lefthook install` to activate.
 ```
@@ -157,36 +157,36 @@ If a snag remote already exists at an older version, it updates the ref
 in place without touching the rest of the file. If it's already current,
 it does nothing.
 
-### `snag diff`
+### `snag check diff`
 
 ```
-$ snag diff
+$ snag check diff
 snag: match "do not merge" in staged diff
 ```
 
-### `snag msg`
+### `snag check msg`
 
 Two-pass approach: first strips git trailer lines (`Key: Value`) matching the
 blocklist, rewriting the file in place. Then checks the remaining message body.
 
 ```
-$ snag msg .git/COMMIT_EDITMSG
+$ snag check msg .git/COMMIT_EDITMSG
 snag: removed 1 trailer line(s)
 ```
 
 ```
-$ snag msg .git/COMMIT_EDITMSG
+$ snag check msg .git/COMMIT_EDITMSG
 snag: match "fixme" in commit message
   to recover: git commit -eF .git/COMMIT_EDITMSG
 ```
 
-### `snag push`
+### `snag check push`
 
 Scans all unpushed commits — both messages and diffs. The safety net for
 anything that slipped past per-commit hooks.
 
 ```
-$ snag push
+$ snag check push
 snag: 4 patterns checked against 3 commits
 ```
 
@@ -253,17 +253,17 @@ works anywhere:
 pre-commit:
   commands:
     blocklist:
-      run: snag diff
+      run: snag check diff
 
 commit-msg:
   commands:
     blocklist:
-      run: snag msg {1}
+      run: snag check msg {1}
 
 pre-push:
   commands:
     blocklist:
-      run: snag push
+      run: snag check push
 ```
 
 ### husky
@@ -272,9 +272,9 @@ pre-push:
 {
   "husky": {
     "hooks": {
-      "pre-commit": "snag diff",
-      "commit-msg": "snag msg $HUSKY_GIT_PARAMS",
-      "pre-push": "snag push"
+      "pre-commit": "snag check diff",
+      "commit-msg": "snag check msg $HUSKY_GIT_PARAMS",
+      "pre-push": "snag check push"
     }
   }
 }
@@ -289,17 +289,17 @@ repos:
     hooks:
       - id: snag-diff
         name: snag blocklist
-        entry: snag diff
+        entry: snag check diff
         language: system
         stages: [pre-commit]
       - id: snag-msg
         name: snag commit message
-        entry: snag msg
+        entry: snag check msg
         language: system
         stages: [commit-msg]
       - id: snag-push
         name: snag push check
-        entry: snag push
+        entry: snag check push
         language: system
         stages: [pre-push]
 ```
@@ -309,7 +309,7 @@ repos:
 ```bash
 #!/bin/sh
 # .git/hooks/pre-commit
-snag diff
+snag check diff
 ```
 
 ## direnv canary

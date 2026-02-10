@@ -37,7 +37,7 @@ func TestRunPush_MissingBlocklist(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"push", "--blocklist", filepath.Join(dir, "no-such-file")})
+	rootCmd.SetArgs([]string{"check", "push", "--blocklist", filepath.Join(dir, "no-such-file")})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for missing blocklist, got: %v", err)
@@ -62,7 +62,7 @@ func TestRunPush_CleanPush(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -98,7 +98,7 @@ func TestRunPush_MessageMatch(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -153,7 +153,7 @@ func TestRunPush_DiffMatchInSecondCommit(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
 	err = rootCmd.Execute()
 
 	w.Close()
@@ -198,7 +198,7 @@ func TestRunPush_DiffMatch(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
 	err := rootCmd.Execute()
 
 	w.Close()

@@ -14,7 +14,7 @@ func TestInstallHooks_NoLefthookYml(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err == nil {
 		t.Fatal("expected error when no lefthook config exists")
@@ -33,7 +33,7 @@ func TestInstallHooks_FindsYamlExtension(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -56,7 +56,7 @@ func TestInstallHooks_AddsRemote(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -101,7 +101,7 @@ remotes:
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -143,7 +143,7 @@ remotes:
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -173,7 +173,7 @@ func TestInstallHooks_DetectsExistingInLocal(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -222,7 +222,7 @@ remotes:
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -258,7 +258,7 @@ func TestInstallHooks_LocalFlag(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks", "--local"})
+	rootCmd.SetArgs([]string{"install", "--local"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -291,7 +291,7 @@ func TestInstallHooks_SharedFlag(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks", "--shared"})
+	rootCmd.SetArgs([]string{"install", "--shared"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -314,7 +314,7 @@ func TestInstallHooks_LocalFlagCreatesFile(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks", "--local"})
+	rootCmd.SetArgs([]string{"install", "--local"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -349,7 +349,7 @@ func TestInstallHooks_NonTTYDefaultsToShared(t *testing.T) {
 	defer func() { isTTY = origIsTTY }()
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks"})
+	rootCmd.SetArgs([]string{"install"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -377,7 +377,7 @@ func TestInstallHooks_DryRunDoesNotWrite(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks", "--dry-run"})
+	rootCmd.SetArgs([]string{"install", "--dry-run"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -399,7 +399,7 @@ func TestInstallHooks_DryRunLocalDoesNotCreate(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks", "--local", "--dry-run"})
+	rootCmd.SetArgs([]string{"install", "--local", "--dry-run"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -430,7 +430,7 @@ remotes:
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"install-hooks", "--dry-run"})
+	rootCmd.SetArgs([]string{"install", "--dry-run"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
