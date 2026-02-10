@@ -45,7 +45,7 @@ var hooks = []Hook{
 	{
 		Name:   "prepare",
 		Use:    "prepare FILE [SOURCE] [SHA]",
-		Short:  "Prepend ticket number from branch name (prepare-commit-msg)",
+		Short:  "Check auto-generated commit message against policies (prepare-commit-msg)",
 		Args:   cobra.RangeArgs(1, 3),
 		RunE:   runPrepare,
 		TestFn: testPrepare,

@@ -36,8 +36,9 @@ post-checkout:
 
 prepare-commit-msg:
   commands:
-    snag-ticket-inject:
+    blocklist:
       run: snag check prepare {1} {2} {3}
       fail_text: >
-        Failed to prepend ticket number from branch name.
+        Auto-generated commit message contains a blocked pattern.
+        Use: git commit -m "your message" or git commit -e
         https://github.com/dpritchett/snag

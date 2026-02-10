@@ -37,7 +37,7 @@ All production code lives in the package `main` at the repo root.
 | `msg.go` | Commit-msg: two-pass — strip matching trailer lines then check remaining body |
 | `push.go` | Pre-push: scans commit messages AND diffs for all unpushed commits (`@{upstream}..HEAD`) |
 | `checkout.go` | Post-checkout: warns when a repo has a `.blocklist` but snag hooks aren't installed. Checks lefthook configs for snag remote and `.git/hooks/` for snag scripts |
-| `prepare.go` | Prepare-commit-msg: extracts ticket number from branch name, prepends to commit message. Default regex `(\d+)-`; override via `SNAG_TICKET_PATTERN` env var |
+| `prepare.go` | Prepare-commit-msg: checks auto-generated commit messages (merge, template, amend) against blocklist. Skips `-m` messages (commit-msg handles those) |
 | `install_hooks.go` | `snag install` — adds/updates snag remote in lefthook config. Reads YAML to understand structure, writes via string append/replace to preserve formatting |
 
 **Data flow:** git hook → `snag check <subcommand>` → `resolvePatterns` (walk up for `.blocklist` files + `SNAG_BLOCKLIST` env var) → shell out to git → pattern match → exit code (0 = clean, 1 = violation).
