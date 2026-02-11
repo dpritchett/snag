@@ -10,15 +10,14 @@ const fishHook = `function __snag_check --on-variable PWD
     # Fast bail: not a git repo
     test -d .git; or return
 
-    # Fast bail: no snag config in this directory
-    test -f snag.toml -o -f snag-local.toml -o -f .blocklist; or return
-
-    # Fast bail: lefthook pre-commit hook exists and mentions lefthook
+    # Fast bail: lefthook is the hook runner AND its config references snag
     set -l hook .git/hooks/pre-commit
-    test -f $hook; and grep -q lefthook $hook; and return
+    if test -f $hook; and grep -q lefthook $hook
+        grep -rql snag lefthook.yml lefthook-local.yml 2>/dev/null; and return
+    end
 
-    # Slow path: call snag for full walk-up detection
-    snag check checkout -q 2>/dev/null; and return
+    # Check if snag config governs this repo (walks up directory tree)
+    snag config 2>/dev/null | grep -q .; or return
 
     # Once-per-repo-per-session guard
     set -l repo_id (git rev-parse --show-toplevel 2>/dev/null)
