@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -259,6 +260,50 @@ rename to new.env`
 
 	t.Run("empty input", func(t *testing.T) {
 		if got := stripDiffMeta(""); got != "" {
+			t.Errorf("expected empty, got %q", got)
+		}
+	})
+}
+
+func TestStripDiffNoise(t *testing.T) {
+	t.Run("keeps only added lines", func(t *testing.T) {
+		// After stripDiffMeta, a diff has content lines like:
+		// +added line
+		// -removed line
+		//  context line (space prefix)
+		input := "+added line\n-removed line\n context line\n+another add"
+		got := stripDiffNoise(input)
+		if !strings.Contains(got, "added line") {
+			t.Error("should keep added lines")
+		}
+		if !strings.Contains(got, "another add") {
+			t.Error("should keep second added line")
+		}
+		if strings.Contains(got, "removed line") {
+			t.Error("should exclude removed lines")
+		}
+		if strings.Contains(got, "context line") {
+			t.Error("should exclude context lines")
+		}
+	})
+
+	t.Run("strips leading plus", func(t *testing.T) {
+		got := stripDiffNoise("+hello world")
+		if got != "hello world" {
+			t.Errorf("expected %q, got %q", "hello world", got)
+		}
+	})
+
+	t.Run("empty input", func(t *testing.T) {
+		got := stripDiffNoise("")
+		if got != "" {
+			t.Errorf("expected empty, got %q", got)
+		}
+	})
+
+	t.Run("no added lines", func(t *testing.T) {
+		got := stripDiffNoise("-removed\n context")
+		if got != "" {
 			t.Errorf("expected empty, got %q", got)
 		}
 	})

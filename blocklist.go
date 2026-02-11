@@ -141,6 +141,20 @@ func resolvePatterns(cmd *cobra.Command) ([]string, error) {
 	return deduplicatePatterns(patterns), nil
 }
 
+// stripDiffNoise keeps only added lines from a unified diff.
+// After stripDiffMeta removes headers, this filters out removed lines
+// (- prefix) and context lines (no prefix), keeping only additions
+// (+ prefix) with the leading + stripped.
+func stripDiffNoise(diff string) string {
+	var added []string
+	for _, line := range strings.Split(diff, "\n") {
+		if strings.HasPrefix(line, "+") {
+			added = append(added, line[1:])
+		}
+	}
+	return strings.Join(added, "\n")
+}
+
 // stripDiffMeta removes unified diff metadata lines (headers, index,
 // hunk markers) so only actual content is checked for policy violations.
 // This prevents filenames in diff headers from triggering false positives.

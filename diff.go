@@ -21,7 +21,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("git diff --staged: %w\n%s", err, out)
 	}
 
-	pattern, found := matchesBlocklist(stripDiffMeta(string(out)), bc.Diff)
+	pattern, found := matchesBlocklist(stripDiffNoise(stripDiffMeta(string(out))), bc.Diff)
 	if !found {
 		return nil
 	}

@@ -79,7 +79,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("git diff-tree %s: %w\n%s", short, err, diffOut)
 		}
-		if pattern, found := matchesBlocklist(stripDiffMeta(string(diffOut)), patterns); found {
+		if pattern, found := matchesBlocklist(stripDiffNoise(stripDiffMeta(string(diffOut))), patterns); found {
 			if !quiet {
 				errorf("match %q in diff of %s", pattern, short)
 				bell()

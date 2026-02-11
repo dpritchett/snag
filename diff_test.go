@@ -199,6 +199,49 @@ func TestRunDiff_ExplicitFlagSkipsWalk(t *testing.T) {
 	}
 }
 
+func TestRunDiff_RemovingBlockedWordPasses(t *testing.T) {
+	dir := initGitRepo(t)
+	initialCommit(t, dir)
+
+	// Use a test-only pattern to avoid triggering the repo's own pre-commit hook.
+	pattern := "block" + "ed_test_word"
+	blPath := filepath.Join(dir, ".blocklist")
+	os.WriteFile(blPath, []byte(pattern+"\n"), 0644)
+
+	// First, commit a file containing the blocked pattern.
+	filePath := filepath.Join(dir, "notes.txt")
+	os.WriteFile(filePath, []byte(pattern+" appears here\n"), 0644)
+	for _, args := range [][]string{
+		{"add", "notes.txt"},
+		{"commit", "-m", "add notes"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	// Now remove the blocked pattern and stage the change.
+	os.WriteFile(filePath, []byte("clean content\n"), 0644)
+	addCmd := exec.Command("git", "add", "notes.txt")
+	addCmd.Dir = dir
+	if out, err := addCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", blPath})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("removing a blocked word should not trigger a violation, got: %v", err)
+	}
+}
+
 func TestRunDiff_MatchFound(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)
