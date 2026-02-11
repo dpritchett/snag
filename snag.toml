@@ -1,0 +1,18 @@
+min_version = "0.10.0"
+
+[block]
+diff = [
+  "DO NOT MERGE",
+  "DO NOT COMMIT",
+  "FIXME",
+  "HACK",
+]
+msg = [
+  "DO NOT MERGE",
+  "FIXME",
+  "WIP",
+  "fixup!",
+  "squash!",
+]
+# push: omit to inherit diff + msg patterns as a safety net
+branch = ["main", "master"]
