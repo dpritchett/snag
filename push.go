@@ -66,7 +66,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("git log %s: %w\n%s", short, err, msgOut)
 		}
-		if pattern, found := matchesBlocklist(string(msgOut), patterns); found {
+		if pattern, found := matchesPattern(string(msgOut), patterns); found {
 			if !quiet {
 				errorf("match %q in message of %s", pattern, short)
 				bell()
@@ -79,7 +79,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("git diff-tree %s: %w\n%s", short, err, diffOut)
 		}
-		if pattern, found := matchesBlocklist(stripDiffNoise(stripDiffMeta(string(diffOut))), patterns); found {
+		if pattern, found := matchesPattern(stripDiffNoise(stripDiffMeta(string(diffOut))), patterns); found {
 			if !quiet {
 				errorf("match %q in diff of %s", pattern, short)
 				bell()

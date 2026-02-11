@@ -39,10 +39,10 @@ func loadBlocklist(path string) ([]string, error) {
 	return patterns, nil
 }
 
-// matchesBlocklist checks whether text contains any of the given patterns.
+// matchesPattern checks whether text contains any of the given patterns.
 // Comparison is case-insensitive. Returns the matched pattern and true on
 // the first hit, or ("", false) if nothing matches.
-func matchesBlocklist(text string, patterns []string) (string, bool) {
+func matchesPattern(text string, patterns []string) (string, bool) {
 	lower := strings.ToLower(text)
 	for _, p := range patterns {
 		if strings.Contains(lower, p) {

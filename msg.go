@@ -21,7 +21,7 @@ func stripMatchingTrailers(lines []string, patterns []string) ([]string, int) {
 	removed := 0
 	for _, line := range lines {
 		if isTrailerLine(line) {
-			if _, matched := matchesBlocklist(line, patterns); matched {
+			if _, matched := matchesPattern(line, patterns); matched {
 				removed++
 				continue
 			}
@@ -64,7 +64,7 @@ func runMsg(cmd *cobra.Command, args []string) error {
 	// Pass 2 — hard reject: check the remaining message body. Unlike pass 1,
 	// a match here blocks the commit entirely.
 	body := strings.Join(cleaned, "\n")
-	pattern, found := matchesBlocklist(body, bc.Msg)
+	pattern, found := matchesPattern(body, bc.Msg)
 	if !found {
 		return nil
 	}

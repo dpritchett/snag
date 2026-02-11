@@ -39,7 +39,7 @@ func runPrepare(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pattern, found := matchesBlocklist(strings.Join(body, "\n"), bc.Msg)
+	pattern, found := matchesPattern(strings.Join(body, "\n"), bc.Msg)
 	if !found {
 		return nil
 	}

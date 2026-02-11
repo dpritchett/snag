@@ -181,7 +181,7 @@ func TestDeduplicatePatterns(t *testing.T) {
 	})
 }
 
-func TestMatchesBlocklist(t *testing.T) {
+func TestMatchesPattern(t *testing.T) {
 	patterns := []string{"todo", "fixme", "hack"}
 
 	tests := []struct {
@@ -200,9 +200,9 @@ func TestMatchesBlocklist(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotPattern, gotMatch := matchesBlocklist(tc.text, tc.patterns)
+			gotPattern, gotMatch := matchesPattern(tc.text, tc.patterns)
 			if gotPattern != tc.wantPattern || gotMatch != tc.wantMatch {
-				t.Errorf("matchesBlocklist(%q, ...) = (%q, %v), want (%q, %v)",
+				t.Errorf("matchesPattern(%q, ...) = (%q, %v), want (%q, %v)",
 					tc.text, gotPattern, gotMatch, tc.wantPattern, tc.wantMatch)
 			}
 		})
@@ -221,10 +221,10 @@ index 0000000..abc1234
 +DB_HOST=localhost`
 
 		got := stripDiffMeta(diff)
-		if _, found := matchesBlocklist(got, []string{"secret.env"}); found {
+		if _, found := matchesPattern(got, []string{"secret.env"}); found {
 			t.Error("filename should have been stripped from diff metadata")
 		}
-		if _, found := matchesBlocklist(got, []string{"hunter2"}); !found {
+		if _, found := matchesPattern(got, []string{"hunter2"}); !found {
 			t.Error("content line should still be present")
 		}
 	})
@@ -236,10 +236,10 @@ rename from old.env
 rename to new.env`
 
 		got := stripDiffMeta(diff)
-		if _, found := matchesBlocklist(got, []string{"old.env"}); found {
+		if _, found := matchesPattern(got, []string{"old.env"}); found {
 			t.Error("rename from filename should be stripped")
 		}
-		if _, found := matchesBlocklist(got, []string{"new.env"}); found {
+		if _, found := matchesPattern(got, []string{"new.env"}); found {
 			t.Error("rename to filename should be stripped")
 		}
 	})
@@ -253,7 +253,7 @@ rename to new.env`
 +new password here`
 
 		got := stripDiffMeta(diff)
-		if _, found := matchesBlocklist(got, []string{"password"}); !found {
+		if _, found := matchesPattern(got, []string{"password"}); !found {
 			t.Error("content with 'password' should be preserved")
 		}
 	})

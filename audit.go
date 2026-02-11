@@ -158,7 +158,7 @@ func scanCommit(sha string, bc *BlockConfig) commitReport {
 	if len(bc.Msg) > 0 {
 		msgOut, err := exec.Command("git", "log", "-1", "--format=%B", sha).CombinedOutput()
 		if err == nil {
-			if pattern, found := matchesBlocklist(string(msgOut), bc.Msg); found {
+			if pattern, found := matchesPattern(string(msgOut), bc.Msg); found {
 				report.Matches = append(report.Matches, violation{Kind: "msg", Pattern: pattern})
 			}
 		}
@@ -168,7 +168,7 @@ func scanCommit(sha string, bc *BlockConfig) commitReport {
 	if len(bc.Diff) > 0 {
 		diffOut, err := exec.Command("git", "diff-tree", "-p", sha).CombinedOutput()
 		if err == nil {
-			if pattern, found := matchesBlocklist(stripDiffNoise(stripDiffMeta(string(diffOut))), bc.Diff); found {
+			if pattern, found := matchesPattern(stripDiffNoise(stripDiffMeta(string(diffOut))), bc.Diff); found {
 				report.Matches = append(report.Matches, violation{Kind: "diff", Pattern: pattern})
 			}
 		}
