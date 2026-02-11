@@ -90,7 +90,7 @@ func findSnagRemote(data []byte) (string, error) {
 // If createIfMissing is true and the file doesn't exist, it creates it.
 // If dryRun is true, it returns a unified diff string describing the change without writing.
 func installOrUpdateSnagRemote(filename string, createIfMissing bool, dryRun bool) (string, error) {
-	ref := Version
+	ref := versionRef()
 
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -318,4 +318,13 @@ func runInstallHooks(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
 	return nil
+}
+
+// versionRef returns the Version string with a "v" prefix for use as a git tag ref.
+// Dev builds are returned as-is since they aren't real tags.
+func versionRef() string {
+	if strings.HasPrefix(Version, "dev") {
+		return Version
+	}
+	return "v" + strings.TrimPrefix(Version, "v")
 }
