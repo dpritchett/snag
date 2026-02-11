@@ -47,7 +47,7 @@ All production code lives in the package `main` at the repo root.
 
 **Config resolution order (`resolveBlockConfig`):**
 1. If `--blocklist` flag is explicitly passed → legacy mode, flat shared patterns (overrides everything)
-2. Otherwise → `walkConfig` from CWD to root. Single-pass: prefer `snag.toml` over `.blocklist` at each level. First file type found sets mode for entire walk. Files merge additively up the tree.
+2. Otherwise → `walkConfig` from CWD to root. Single-pass: prefer `snag.toml` over `.blocklist` at each level. First file type found sets mode for entire walk. Both `snag.toml` and `snag-local.toml` are checked at each level and merged additively up the tree. `snag-local.toml` only adds patterns — it never overrides `snag.toml`.
 3. `SNAG_BLOCKLIST` env var → always merges into Diff/Msg/Push
 4. `SNAG_PROTECTED_BRANCHES` env var → always merges into Branch
 5. Default protected branches `["main", "master"]` → only when Branch is still empty
@@ -72,7 +72,8 @@ snag's own repo uses `lefthook.yml` to dogfood via `go run .`.
 ## Key Design Decisions
 
 - `snag.toml` is version-controlled team policy; `.blocklist` is legacy/deprecated
-- Sensitive patterns belong in `SNAG_BLOCKLIST` env var, not in committed config
+- `snag-local.toml` is gitignored, personal/sensitive patterns — additive overlay alongside `snag.toml` at each directory level
+- Sensitive patterns belong in `snag-local.toml` or `SNAG_BLOCKLIST` env var, not in committed config
 - `resolveBlockConfig` centralizes all per-hook pattern resolution; subcommands use the appropriate field (`bc.Diff`, `bc.Msg`, `bc.PushPatterns()`, `bc.Branch`)
 - `resolvePatterns` (flat list) is retained for `test_cmd.go` which only needs a simple pattern list
 - `install` must never mangle existing YAML — parse to read, string ops to write

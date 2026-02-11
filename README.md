@@ -21,8 +21,9 @@ snag is that project, kept small on purpose.
   fragment any repo can pull in via
   [lefthook remotes](https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md#remotes).
 
-- **A small Go CLI** (`snag`) for per-repo content policy enforcement via a
-  `.blocklist` file. For checks where no good off-the-shelf tool exists yet.
+- **A small Go CLI** (`snag`) for per-repo content policy enforcement via
+  `snag.toml` (or legacy `.blocklist`). For checks where no good off-the-shelf
+  tool exists yet.
 
 ## Install
 
@@ -283,27 +284,61 @@ snag completion zsh > "${fpath[1]}/_snag"
 
 Restart your shell (or `source` the file) to activate.
 
-## `.blocklist` file format
+## Configuration
+
+### `snag.toml` — team policy
+
+The primary config format. Check it into your repo alongside `lefthook.yml`.
+Each hook phase gets its own pattern list:
+
+```toml
+# snag.toml — committed, version-controlled team policy
+min_version = "0.10.0"
+
+[block]
+diff = ["TODO", "NOCOMMIT"]
+msg  = ["WIP", "fixup!", "squash!"]
+# push: omit to inherit the union of diff + msg as a safety net
+branch = ["main", "master"]
+```
+
+Generate a starter config with `snag init`:
+
+```bash
+snag init              # creates snag.toml with common patterns
+snag init --local      # creates snag-local.toml for personal patterns
+```
+
+### `snag-local.toml` — personal/sensitive patterns
+
+A gitignored overlay for patterns you don't want committed. Same format as
+`snag.toml`, merged additively — it only adds patterns, never overrides.
+
+```toml
+# snag-local.toml — gitignored, personal/sensitive patterns
+[block]
+diff = ["clientname", "internal-codename"]
+msg  = ["clientname"]
+```
+
+Both files are checked at each directory level during the config walk. Patterns
+accumulate as snag walks up to the filesystem root:
 
 ```
-# Patterns to deny from commits (case-insensitive substring match)
-# One per line. Blank lines and comments (#) are ignored.
-TODO
-HACK
-DO NOT MERGE
-fixme
-WIP
+~/projects/acme/snag.toml            ← team policy: "TODO", "WIP"
+~/projects/acme/snag-local.toml      ← personal: "clientname"
+~/projects/acme/api/snag.toml        ← additional repo-specific patterns
+~/projects/acme/api/snag-local.toml  ← additional personal patterns
+~/projects/acme/api/service/         ← no config here, protected by all above
 ```
 
-Each repo can carry its own `.blocklist` with whatever patterns make sense for
-that project. You can also place a `.blocklist` in a parent directory to cover
-every repo underneath it:
+### Legacy `.blocklist` format
 
-```
-~/projects/acme/.blocklist          ← "codename", "customername"
-~/projects/acme/api/.blocklist      ← additional repo-specific patterns (optional)
-~/projects/acme/api/service/        ← no .blocklist, still protected by both above
-```
+Still supported as a fallback. When `snag.toml` exists at any level, `.blocklist`
+files are ignored entirely (clean cutover).
+
+Unlike `snag.toml`, a `.blocklist` feeds the same patterns to all hooks — no
+per-phase separation. See the Quick start section above for an example.
 
 snag ships no default patterns — that's a policy decision, not a tool decision.
 
