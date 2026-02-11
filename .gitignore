@@ -1,7 +1,8 @@
 # Binary
 /snag
 
-# Blocklist is local policy — never commit it
+# Local/sensitive policy — never commit these
+snag-local.toml
 .blocklist
 
 # GoReleaser
