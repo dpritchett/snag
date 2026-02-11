@@ -19,14 +19,11 @@ const fishHook = `function __snag_check --on-variable PWD
     # Check if snag config governs this repo (walks up directory tree)
     snag config 2>/dev/null | grep -q .; or return
 
-    # Once-per-repo-per-session guard
-    set -l repo_id (git rev-parse --show-toplevel 2>/dev/null)
-    test -z "$repo_id"; and return
-    contains -- $repo_id $__snag_warned; and return
-    set -g -a __snag_warned $repo_id
-
     # Respect SNAG_QUIET
     test -n "$SNAG_QUIET"; and return
+
+    set -l repo_id (git rev-parse --show-toplevel 2>/dev/null)
+    test -z "$repo_id"; and return
 
     echo (set_color --bold red)"snag:"(set_color normal)" hooks not installed in "(set_color --bold yellow)(basename $repo_id)(set_color normal)" — run: "(set_color green)"snag install && lefthook install"(set_color normal) >&2
     printf '\a' # audible bell

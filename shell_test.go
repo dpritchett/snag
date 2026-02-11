@@ -23,8 +23,8 @@ func TestShellFish_OutputContainsHook(t *testing.T) {
 	if !strings.Contains(out, "--on-variable PWD") {
 		t.Error("output should contain the PWD hook trigger")
 	}
-	if !strings.Contains(out, "__snag_warned") {
-		t.Error("output should contain the once-per-session guard")
+	if !strings.Contains(out, "set_color") {
+		t.Error("output should contain colorized warning")
 	}
 	if !strings.Contains(out, "SNAG_QUIET") {
 		t.Error("output should reference SNAG_QUIET")
