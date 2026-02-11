@@ -28,7 +28,8 @@ const fishHook = `function __snag_check --on-variable PWD
     # Respect SNAG_QUIET
     test -n "$SNAG_QUIET"; and return
 
-    echo "snag: hooks not installed in "(basename $repo_id)" — run: snag install && lefthook install" >&2
+    echo (set_color --bold red)"snag:"(set_color normal)" hooks not installed in "(set_color --bold yellow)(basename $repo_id)(set_color normal)" — run: "(set_color green)"snag install && lefthook install"(set_color normal) >&2
+    printf '\a' # audible bell
 end
 `
 
