@@ -35,7 +35,7 @@ All production code lives in the package `main` at the repo root.
 | `config.go` | Structured config: `snagTOML`/`BlockConfig` types, `loadSnagTOML`, `walkConfig` (single-pass walk for `snag.toml` OR `.blocklist`), `resolveBlockConfig` (per-hook pattern resolution with all sources), `PushPatterns`/`HasAnyPatterns` helpers |
 | `blocklist.go` | Core pattern primitives: `loadBlocklist`, `matchesBlocklist`, `isTrailerLine`, `walkBlocklists`, `loadEnvBlocklist`, `deduplicatePatterns`, plus `resolvePatterns` (flat pattern resolution, used by `test_cmd.go`) |
 | `diff.go` | Pre-commit: runs `git diff --staged`, checks output against blocklist |
-| `msg.go` | Commit-msg: two-pass — strip matching trailer lines then check remaining body |
+| `msg.go` | Commit-msg: two-pass — (1) silently removes trailer lines (e.g. `Generated-by`) matching block patterns so the commit proceeds without them, then (2) rejects the commit if the remaining body matches. Trailers are stripped, body text is blocked |
 | `push.go` | Pre-push: scans commit messages AND diffs for all unpushed commits (`@{upstream}..HEAD`) |
 | `checkout.go` | Post-checkout: warns when a repo has a snag config (`snag.toml` or `.blocklist`) but snag hooks aren't installed. Checks lefthook configs for snag remote and `.git/hooks/` for snag scripts |
 | `prepare.go` | Prepare-commit-msg: checks auto-generated commit messages (merge, template, amend) against blocklist. Skips `-m` messages (commit-msg handles those) |

@@ -8,9 +8,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// stripTrailers removes trailer lines that match any blocklist pattern.
-// Returns the filtered lines and the count of removed lines.
-func stripTrailers(lines []string, patterns []string) ([]string, int) {
+// stripMatchingTrailers silently removes git trailer lines (Key: Value) whose
+// content matches a block pattern. This rewrites the commit message file in
+// place — the commit proceeds without the offending trailers rather than being
+// rejected. Useful for auto-injected trailers like Generated-by that you want
+// gone without interrupting the developer's flow.
+//
+// Non-trailer lines are never touched here; those are checked separately in
+// pass 2 of runMsg, which *does* reject the commit on a match.
+func stripMatchingTrailers(lines []string, patterns []string) ([]string, int) {
 	var kept []string
 	removed := 0
 	for _, line := range lines {
@@ -41,11 +47,13 @@ func runMsg(cmd *cobra.Command, args []string) error {
 
 	quiet, _ := cmd.Flags().GetBool("quiet")
 
-	// Pass 1: strip matching trailers
+	// Pass 1 — silent removal: strip trailer lines (like Generated-by) that
+	// match block patterns. The commit message file is rewritten in place so
+	// the commit proceeds cleanly without the matched trailers.
 	lines := strings.Split(string(data), "\n")
-	filtered, removed := stripTrailers(lines, bc.Msg)
+	cleaned, removed := stripMatchingTrailers(lines, bc.Msg)
 	if removed > 0 {
-		if err := os.WriteFile(args[0], []byte(strings.Join(filtered, "\n")), 0644); err != nil {
+		if err := os.WriteFile(args[0], []byte(strings.Join(cleaned, "\n")), 0644); err != nil {
 			return fmt.Errorf("rewriting commit message: %w", err)
 		}
 		if !quiet {
@@ -53,8 +61,9 @@ func runMsg(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Pass 2: check remaining body for policy violations
-	body := strings.Join(filtered, "\n")
+	// Pass 2 — hard reject: check the remaining message body. Unlike pass 1,
+	// a match here blocks the commit entirely.
+	body := strings.Join(cleaned, "\n")
 	pattern, found := matchesBlocklist(body, bc.Msg)
 	if !found {
 		return nil

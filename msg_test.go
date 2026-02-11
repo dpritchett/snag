@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-func TestStripTrailers_NoTrailers(t *testing.T) {
+func TestStripMatchingTrailers_NoTrailers(t *testing.T) {
 	lines := []string{"fix bug", "", "body"}
-	got, removed := stripTrailers(lines, []string{"bot"})
+	got, removed := stripMatchingTrailers(lines, []string{"bot"})
 	if removed != 0 {
 		t.Errorf("expected 0 removed, got %d", removed)
 	}
@@ -18,9 +18,9 @@ func TestStripTrailers_NoTrailers(t *testing.T) {
 	}
 }
 
-func TestStripTrailers_MatchingTrailerRemoved(t *testing.T) {
+func TestStripMatchingTrailers_MatchingTrailerRemoved(t *testing.T) {
 	lines := []string{"fix bug", "", "Signed-off-by: Bot"}
-	got, removed := stripTrailers(lines, []string{"bot"})
+	got, removed := stripMatchingTrailers(lines, []string{"bot"})
 	if removed != 1 {
 		t.Errorf("expected 1 removed, got %d", removed)
 	}
@@ -29,9 +29,9 @@ func TestStripTrailers_MatchingTrailerRemoved(t *testing.T) {
 	}
 }
 
-func TestStripTrailers_NonMatchingTrailerKept(t *testing.T) {
+func TestStripMatchingTrailers_NonMatchingTrailerKept(t *testing.T) {
 	lines := []string{"fix bug", "", "Signed-off-by: Human"}
-	got, removed := stripTrailers(lines, []string{"bot"})
+	got, removed := stripMatchingTrailers(lines, []string{"bot"})
 	if removed != 0 {
 		t.Errorf("expected 0 removed, got %d", removed)
 	}
@@ -40,7 +40,7 @@ func TestStripTrailers_NonMatchingTrailerKept(t *testing.T) {
 	}
 }
 
-func TestStripTrailers_PartialMatch(t *testing.T) {
+func TestStripMatchingTrailers_PartialMatch(t *testing.T) {
 	lines := []string{
 		"fix bug",
 		"",
@@ -48,7 +48,7 @@ func TestStripTrailers_PartialMatch(t *testing.T) {
 		"Reviewed-by: Human",
 		"Co-authored-by: Bot Helper",
 	}
-	got, removed := stripTrailers(lines, []string{"bot"})
+	got, removed := stripMatchingTrailers(lines, []string{"bot"})
 	if removed != 2 {
 		t.Errorf("expected 2 removed, got %d", removed)
 	}
