@@ -40,6 +40,7 @@ All production code lives in the package `main` at the repo root.
 | `checkout.go` | Post-checkout: warns when a repo has a snag config (`snag.toml` or `.blocklist`) but snag hooks aren't installed. Checks lefthook configs for snag remote and `.git/hooks/` for snag scripts |
 | `prepare.go` | Prepare-commit-msg: checks auto-generated commit messages (merge, template, amend) against blocklist. Skips `-m` messages (commit-msg handles those) |
 | `rebase.go` | Pre-rebase: blocks rebase of protected branches (main, master by default). Override via `SNAG_PROTECTED_BRANCHES` env var |
+| `audit.go` | `snag audit` — scans git history for policy violations. Checks commit messages against `bc.Msg` and diffs against `bc.Diff`. Reports all matches grouped by commit. Supports `--limit N` and explicit revision ranges |
 | `install_hooks.go` | `snag install` — adds/updates snag remote in lefthook config. Reads YAML to understand structure, writes via string append/replace to preserve formatting |
 
 **Data flow:** git hook → `snag check <subcommand>` → `resolveBlockConfig` (walk up for `snag.toml` or `.blocklist` files + env vars) → shell out to git → per-hook pattern match → exit code (0 = clean, 1 = violation).

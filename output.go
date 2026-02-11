@@ -9,12 +9,18 @@ import (
 )
 
 var renderer = lipgloss.NewRenderer(os.Stderr)
+var stdoutRenderer = lipgloss.NewRenderer(os.Stdout)
 
 var (
 	errorStyle = renderer.NewStyle().Bold(true).Foreground(lipgloss.Color("9")) // red
 	warnStyle  = renderer.NewStyle().Foreground(lipgloss.Color("11"))           // yellow
 	infoStyle  = renderer.NewStyle().Foreground(lipgloss.Color("10"))           // green
 	hintStyle  = renderer.NewStyle().Foreground(lipgloss.Color("8"))            // dim/gray
+
+	// Stdout styles for report output (audit, etc.)
+	shaStyle     = stdoutRenderer.NewStyle().Foreground(lipgloss.Color("11")) // yellow
+	patternStyle = stdoutRenderer.NewStyle().Bold(true).Foreground(lipgloss.Color("9"))
+	dimStyle     = stdoutRenderer.NewStyle().Foreground(lipgloss.Color("8"))
 )
 
 func errorf(format string, a ...any) {

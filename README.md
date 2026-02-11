@@ -128,6 +128,7 @@ remotes:
 snag check diff        # pre-commit: scan staged changes
 snag check msg FILE    # commit-msg: clean trailers, reject body matches
 snag check push        # pre-push: scan all unpushed commits
+snag audit             # scan git history for policy violations
 snag install           # add/update snag remote in lefthook config
 snag version           # print version and exit
 ```
@@ -190,6 +191,36 @@ $ snag check push
 snag: 4 patterns checked against 3 commits
 ```
 
+### `snag audit`
+
+Scans git history for policy violations — the retroactive check for repos with
+pre-snag history. Checks commit messages against `msg` patterns and diffs
+against `diff` patterns, then reports every match.
+
+```
+$ snag audit
+snag: scanning 50 commits...
+
+  abc1234 — "Add integration config"
+    diff: match "HACK" in commit diff
+
+  def5678 — "Update deploy script"
+    msg:  match "fixup!" in commit msg
+    diff: match "HACK" in commit diff
+
+snag: 3 violations found in 2 of 50 commits
+```
+
+Exits 1 when violations are found, 0 when clean — CI-friendly.
+
+```bash
+snag audit                    # last 50 commits (default)
+snag audit --limit 10         # last 10 commits
+snag audit --limit 0          # full history
+snag audit main..HEAD         # explicit range
+snag audit -q                 # summary line + exit code only
+```
+
 ### Flags
 
 ```
@@ -217,6 +248,20 @@ do not merge"
 `SNAG_BLOCKLIST` is additive — its patterns are merged on top of whatever the
 directory walk (or explicit `--blocklist`) found. Handy for CI, shell rc files,
 direnv, or mise.
+
+### Color output
+
+snag uses color when connected to a terminal and suppresses it in pipes and CI
+environments. This follows the [NO_COLOR](https://no-color.org/) standard:
+
+```bash
+NO_COLOR=1 snag audit          # force colors off (any value works)
+CLICOLOR_FORCE=1 snag audit    # force colors on, even in pipes/CI
+```
+
+No snag-specific color flag needed — if your terminal supports color, you get
+color. If you're piping to a file or running in CI, colors are stripped
+automatically.
 
 ### Shell completions
 
