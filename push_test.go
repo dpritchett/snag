@@ -27,29 +27,12 @@ func commitFile(t *testing.T, dir, name, content, message string) {
 	}
 }
 
-func TestRunPush_MissingBlocklist(t *testing.T) {
-	dir := initGitRepo(t)
-	initialCommit(t, dir)
-	commitFile(t, dir, "a.txt", "hello\n", "add a")
-
-	oldDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(oldDir)
-
-	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "push", "--blocklist", filepath.Join(dir, "no-such-file")})
-	err := rootCmd.Execute()
-	if err != nil {
-		t.Fatalf("expected nil error for missing blocklist, got: %v", err)
-	}
-}
-
 func TestRunPush_CleanPush(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("secret\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"secret\"]\nmsg = [\"secret\"]\n"), 0644)
 
 	commitFile(t, dir, "a.txt", "hello world\n", "add greeting")
 
@@ -62,7 +45,7 @@ func TestRunPush_CleanPush(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push"})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -84,8 +67,8 @@ func TestRunPush_MessageMatch(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("todo\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"todo\"]\nmsg = [\"todo\"]\n"), 0644)
 
 	commitFile(t, dir, "a.txt", "clean content\n", "TODO fix this later")
 
@@ -98,7 +81,7 @@ func TestRunPush_MessageMatch(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push"})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -126,8 +109,8 @@ func TestRunPush_DiffMatchInSecondCommit(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\nmsg = [\"hack\"]\n"), 0644)
 
 	// Commit 1: clean content, clean message
 	commitFile(t, dir, "a.txt", "hello world\n", "add greeting")
@@ -153,7 +136,7 @@ func TestRunPush_DiffMatchInSecondCommit(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push"})
 	err = rootCmd.Execute()
 
 	w.Close()
@@ -184,8 +167,8 @@ func TestRunPush_DiffMatch(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\nmsg = [\"hack\"]\n"), 0644)
 
 	commitFile(t, dir, "a.txt", "this is a hack\n", "add file")
 
@@ -198,7 +181,7 @@ func TestRunPush_DiffMatch(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "push", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "push"})
 	err := rootCmd.Execute()
 
 	w.Close()

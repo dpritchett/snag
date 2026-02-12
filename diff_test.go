@@ -61,26 +61,12 @@ func initialCommit(t *testing.T, dir string) {
 	}
 }
 
-func TestRunDiff_MissingBlocklist(t *testing.T) {
-	dir := initGitRepo(t)
-	oldDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(oldDir)
-
-	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", filepath.Join(dir, "no-such-file")})
-	err := rootCmd.Execute()
-	if err != nil {
-		t.Fatalf("expected nil error for missing blocklist, got: %v", err)
-	}
-}
-
 func TestRunDiff_CleanDiff(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("secret\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"secret\"]\nmsg = [\"secret\"]\n"), 0644)
 
 	stageFile(t, dir, "hello.txt", "hello world\n")
 
@@ -89,17 +75,18 @@ func TestRunDiff_CleanDiff(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "diff"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for clean diff, got: %v", err)
 	}
 }
 
-func TestRunDiff_WalkFindsParentBlocklist(t *testing.T) {
-	// Parent dir has a .blocklist, child git repo does not.
+func TestRunDiff_WalkFindsParentConfig(t *testing.T) {
+	// Parent dir has a snag.toml, child git repo does not.
 	parent := t.TempDir()
-	os.WriteFile(filepath.Join(parent, ".blocklist"), []byte("secretword\n"), 0644)
+	os.WriteFile(filepath.Join(parent, "snag.toml"),
+		[]byte("[block]\ndiff = [\"secretword\"]\n"), 0644)
 
 	child := filepath.Join(parent, "repo")
 	os.MkdirAll(child, 0755)
@@ -124,78 +111,13 @@ func TestRunDiff_WalkFindsParentBlocklist(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "diff"}) // no --blocklist flag
+	rootCmd.SetArgs([]string{"check", "diff"})
 	err := rootCmd.Execute()
 	if err == nil {
-		t.Fatal("expected error from parent blocklist match")
+		t.Fatal("expected error from parent config match")
 	}
 	if !strings.Contains(err.Error(), "secretword") {
 		t.Errorf("error should mention 'secretword', got: %v", err)
-	}
-}
-
-func TestRunDiff_EnvVarAddsPatterns(t *testing.T) {
-	dir := initGitRepo(t)
-	initialCommit(t, dir)
-
-	// repo .blocklist blocks "apple", env var adds "banana"
-	os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("apple\n"), 0644)
-	t.Setenv("SNAG_BLOCKLIST", "banana")
-
-	stageFile(t, dir, "fruit.txt", "I like banana\n")
-
-	oldDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(oldDir)
-
-	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "diff"}) // no --blocklist, walk + env
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error from env var pattern match")
-	}
-	if !strings.Contains(err.Error(), "banana") {
-		t.Errorf("error should mention 'banana', got: %v", err)
-	}
-}
-
-func TestRunDiff_ExplicitFlagSkipsWalk(t *testing.T) {
-	// Parent has a .blocklist with "parentword"
-	parent := t.TempDir()
-	os.WriteFile(filepath.Join(parent, ".blocklist"), []byte("parentword\n"), 0644)
-
-	child := filepath.Join(parent, "repo")
-	os.MkdirAll(child, 0755)
-
-	for _, args := range [][]string{
-		{"init"},
-		{"config", "user.email", "test@test.com"},
-		{"config", "user.name", "Test"},
-	} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = child
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	initialCommit(t, child)
-
-	// child has its own .blocklist with a different word
-	childBl := filepath.Join(child, ".blocklist")
-	os.WriteFile(childBl, []byte("childword\n"), 0644)
-
-	// staged file contains "parentword" but NOT "childword"
-	stageFile(t, child, "data.txt", "parentword is here\n")
-
-	oldDir, _ := os.Getwd()
-	os.Chdir(child)
-	defer os.Chdir(oldDir)
-
-	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", childBl}) // explicit flag
-	err := rootCmd.Execute()
-	if err != nil {
-		t.Fatalf("expected no error (parent blocklist should be skipped), got: %v", err)
 	}
 }
 
@@ -205,8 +127,8 @@ func TestRunDiff_RemovingBlockedWordPasses(t *testing.T) {
 
 	// Use a test-only pattern to avoid triggering the repo's own pre-commit hook.
 	pattern := "block" + "ed_test_word"
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte(pattern+"\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\""+pattern+"\"]\n"), 0644)
 
 	// First, commit a file containing the blocked pattern.
 	filePath := filepath.Join(dir, "notes.txt")
@@ -235,7 +157,7 @@ func TestRunDiff_RemovingBlockedWordPasses(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "diff"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("removing a blocked word should not trigger a violation, got: %v", err)
@@ -246,8 +168,8 @@ func TestRunDiff_MatchFound(t *testing.T) {
 	dir := initGitRepo(t)
 	initialCommit(t, dir)
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("todo\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"todo\"]\n"), 0644)
 
 	stageFile(t, dir, "code.go", "// TODO fix this\n")
 
@@ -256,7 +178,7 @@ func TestRunDiff_MatchFound(t *testing.T) {
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "diff", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"check", "diff"})
 
 	// Capture stderr
 	oldStderr := os.Stderr

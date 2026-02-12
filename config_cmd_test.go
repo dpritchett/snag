@@ -11,7 +11,6 @@ import (
 func TestCollectSources(t *testing.T) {
 	makeCmd := func() *cobra.Command {
 		cmd := &cobra.Command{}
-		cmd.Flags().String("blocklist", ".blocklist", "")
 		cmd.Flags().BoolP("quiet", "q", false, "")
 		return cmd
 	}
@@ -28,7 +27,6 @@ branch = ["main"]
 		orig, _ := os.Getwd()
 		os.Chdir(dir)
 		defer os.Chdir(orig)
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		sources, err := collectSources(makeCmd())
@@ -50,31 +48,6 @@ branch = ["main"]
 		}
 	})
 
-	t.Run("legacy blocklist source", func(t *testing.T) {
-		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("secret-word\n"), 0644)
-
-		orig, _ := os.Getwd()
-		os.Chdir(dir)
-		defer os.Chdir(orig)
-		t.Setenv("SNAG_BLOCKLIST", "")
-		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
-
-		sources, err := collectSources(makeCmd())
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		blCount := 0
-		for _, s := range sources {
-			if s.Kind == "blocklist" {
-				blCount++
-			}
-		}
-		if blCount != 1 {
-			t.Errorf("expected 1 blocklist source, got %d", blCount)
-		}
-	})
-
 	t.Run("env var sources", func(t *testing.T) {
 		dir := t.TempDir()
 		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
@@ -85,7 +58,6 @@ diff = ["HACK"]
 		orig, _ := os.Getwd()
 		os.Chdir(dir)
 		defer os.Chdir(orig)
-		t.Setenv("SNAG_BLOCKLIST", "env-pattern")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "staging")
 
 		sources, err := collectSources(makeCmd())
@@ -99,9 +71,9 @@ diff = ["HACK"]
 				envCount++
 			}
 		}
-		// Should have SNAG_BLOCKLIST + SNAG_PROTECTED_BRANCHES
-		if envCount != 2 {
-			t.Errorf("expected 2 env sources, got %d", envCount)
+		// Should have SNAG_PROTECTED_BRANCHES
+		if envCount != 1 {
+			t.Errorf("expected 1 env source, got %d", envCount)
 		}
 	})
 
@@ -115,7 +87,6 @@ diff = ["HACK"]
 		orig, _ := os.Getwd()
 		os.Chdir(dir)
 		defer os.Chdir(orig)
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		sources, err := collectSources(makeCmd())
@@ -144,7 +115,6 @@ branch = ["main"]
 		orig, _ := os.Getwd()
 		os.Chdir(dir)
 		defer os.Chdir(orig)
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		sources, err := collectSources(makeCmd())
@@ -158,39 +128,12 @@ branch = ["main"]
 		}
 	})
 
-	t.Run("blocklist flag override", func(t *testing.T) {
-		dir := t.TempDir()
-		blFile := filepath.Join(dir, "custom.blocklist")
-		os.WriteFile(blFile, []byte("custom-word\n"), 0644)
-
-		orig, _ := os.Getwd()
-		os.Chdir(dir)
-		defer os.Chdir(orig)
-		t.Setenv("SNAG_BLOCKLIST", "")
-		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
-
-		cmd := makeCmd()
-		cmd.Flags().Set("blocklist", blFile)
-
-		sources, err := collectSources(cmd)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(sources) == 0 {
-			t.Fatal("expected at least one source")
-		}
-		if sources[0].Kind != "blocklist" {
-			t.Errorf("first source should be blocklist, got %s", sources[0].Kind)
-		}
-	})
-
 	t.Run("no config anywhere", func(t *testing.T) {
 		dir := t.TempDir()
 
 		orig, _ := os.Getwd()
 		os.Chdir(dir)
 		defer os.Chdir(orig)
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		sources, err := collectSources(makeCmd())

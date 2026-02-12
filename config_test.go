@@ -227,47 +227,6 @@ diff = ["LOCAL-ONLY"]
 		}
 	})
 
-	t.Run("snag.toml beats .blocklist at same level", func(t *testing.T) {
-		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
-[block]
-diff = ["FROM-TOML"]
-`), 0644)
-		os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("from-blocklist\n"), 0644)
-
-		bc, found, err := walkConfig(dir)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !found {
-			t.Fatal("expected found=true")
-		}
-		// TOML should win; .blocklist ignored
-		if len(bc.Diff) != 1 || bc.Diff[0] != "FROM-TOML" {
-			t.Errorf("diff: got %v, want [FROM-TOML]", bc.Diff)
-		}
-	})
-
-	t.Run("legacy .blocklist fallback", func(t *testing.T) {
-		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("legacy-pattern\n"), 0644)
-
-		bc, found, err := walkConfig(dir)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !found {
-			t.Fatal("expected found=true")
-		}
-		if len(bc.Diff) != 1 || bc.Diff[0] != "legacy-pattern" {
-			t.Errorf("diff: got %v, want [legacy-pattern]", bc.Diff)
-		}
-		// Legacy feeds same patterns to Msg
-		if len(bc.Msg) != 1 || bc.Msg[0] != "legacy-pattern" {
-			t.Errorf("msg: got %v, want [legacy-pattern]", bc.Msg)
-		}
-	})
-
 	t.Run("push explicit empty in TOML", func(t *testing.T) {
 		dir := t.TempDir()
 		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
@@ -305,11 +264,8 @@ diff = ["HACK"]
 }
 
 func TestResolveBlockConfig(t *testing.T) {
-	// Helper to build a cobra command with the --blocklist flag.
 	makeCmd := func() *cobra.Command {
-		cmd := &cobra.Command{}
-		cmd.Flags().String("blocklist", ".blocklist", "")
-		return cmd
+		return &cobra.Command{}
 	}
 
 	t.Run("pure TOML config", func(t *testing.T) {
@@ -325,7 +281,6 @@ branch = ["main"]
 		os.Chdir(dir)
 		defer os.Chdir(orig)
 
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		bc, err := resolveBlockConfig(makeCmd())
@@ -343,35 +298,6 @@ branch = ["main"]
 		}
 	})
 
-	t.Run("env var overlay", func(t *testing.T) {
-		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
-[block]
-diff = ["HACK"]
-msg  = ["WIP"]
-`), 0644)
-
-		orig, _ := os.Getwd()
-		os.Chdir(dir)
-		defer os.Chdir(orig)
-
-		t.Setenv("SNAG_BLOCKLIST", "extra-pattern")
-		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
-
-		bc, err := resolveBlockConfig(makeCmd())
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		// Diff should have both "hack" and "extra-pattern"
-		if len(bc.Diff) != 2 {
-			t.Errorf("diff: got %v, want 2 patterns", bc.Diff)
-		}
-		// Msg should have both "wip" and "extra-pattern"
-		if len(bc.Msg) != 2 {
-			t.Errorf("msg: got %v, want 2 patterns", bc.Msg)
-		}
-	})
-
 	t.Run("branch defaults when empty", func(t *testing.T) {
 		dir := t.TempDir()
 		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
@@ -383,7 +309,6 @@ diff = ["HACK"]
 		os.Chdir(dir)
 		defer os.Chdir(orig)
 
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		bc, err := resolveBlockConfig(makeCmd())
@@ -407,7 +332,6 @@ branch = ["main"]
 		os.Chdir(dir)
 		defer os.Chdir(orig)
 
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "develop, staging")
 
 		bc, err := resolveBlockConfig(makeCmd())
@@ -432,7 +356,6 @@ msg  = ["WIP"]
 		os.Chdir(dir)
 		defer os.Chdir(orig)
 
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		bc, err := resolveBlockConfig(makeCmd())
@@ -458,7 +381,6 @@ push = ["SECRET"]
 		os.Chdir(dir)
 		defer os.Chdir(orig)
 
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		bc, err := resolveBlockConfig(makeCmd())
@@ -482,7 +404,6 @@ diff = ["HACK", "hack", "HACK"]
 		os.Chdir(dir)
 		defer os.Chdir(orig)
 
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		bc, err := resolveBlockConfig(makeCmd())
@@ -491,36 +412,6 @@ diff = ["HACK", "hack", "HACK"]
 		}
 		if len(bc.Diff) != 1 {
 			t.Errorf("diff: got %v, want 1 (deduplicated)", bc.Diff)
-		}
-	})
-
-	t.Run("blocklist flag override", func(t *testing.T) {
-		dir := t.TempDir()
-		blFile := filepath.Join(dir, "custom.blocklist")
-		os.WriteFile(blFile, []byte("custom-pattern\n"), 0644)
-
-		// Also create a snag.toml — it should be ignored.
-		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
-[block]
-diff = ["SHOULD-BE-IGNORED"]
-`), 0644)
-
-		orig, _ := os.Getwd()
-		os.Chdir(dir)
-		defer os.Chdir(orig)
-
-		t.Setenv("SNAG_BLOCKLIST", "")
-		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
-
-		cmd := makeCmd()
-		cmd.Flags().Set("blocklist", blFile)
-
-		bc, err := resolveBlockConfig(cmd)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(bc.Diff) != 1 || bc.Diff[0] != "custom-pattern" {
-			t.Errorf("diff: got %v, want [custom-pattern]", bc.Diff)
 		}
 	})
 
@@ -536,7 +427,6 @@ branch = ["Release-V1"]
 		os.Chdir(dir)
 		defer os.Chdir(orig)
 
-		t.Setenv("SNAG_BLOCKLIST", "")
 		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
 
 		bc, err := resolveBlockConfig(makeCmd())

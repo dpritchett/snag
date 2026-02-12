@@ -27,16 +27,17 @@ func buildDemoCmd() *cobra.Command {
 func buildTestCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          fmt.Sprintf("test [%s]", strings.Join(hookNames(), "|")),
-		Short:        "Smoke-test hooks using your real blocklist config",
+		Short:        "Smoke-test hooks using your real snag.toml config",
 		SilenceUsage: true,
 		Args:         cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			patterns, err := resolvePatterns(cmd)
+			bc, err := resolveBlockConfig(cmd)
 			if err != nil {
 				return err
 			}
+			patterns := deduplicatePatterns(append(append([]string{}, bc.Diff...), bc.Msg...))
 			if len(patterns) == 0 {
-				infof("nothing to test — no patterns found in .blocklist or SNAG_BLOCKLIST")
+				infof("nothing to test — no patterns found in snag.toml")
 				return nil
 			}
 			return runChecks(cmd, args, patterns)
@@ -72,10 +73,11 @@ func runChecks(cmd *cobra.Command, args []string, patterns []string) error {
 		return fmt.Errorf("setting up temp repo: %w", err)
 	}
 
-	// Write a blocklist file in the temp repo so the real resolve logic finds it.
-	blFile := filepath.Join(dir, ".blocklist")
-	if err := os.WriteFile(blFile, []byte(strings.Join(patterns, "\n")+"\n"), 0644); err != nil {
-		return fmt.Errorf("writing temp blocklist: %w", err)
+	// Write a snag.toml in the temp repo so resolveBlockConfig finds it.
+	tomlContent := fmt.Sprintf("[block]\ndiff = [%s]\nmsg = [%s]\n",
+		quotedList(patterns), quotedList(patterns))
+	if err := os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(tomlContent), 0644); err != nil {
+		return fmt.Errorf("writing temp snag.toml: %w", err)
 	}
 
 	type subtest struct {
@@ -116,6 +118,15 @@ func runChecks(cmd *cobra.Command, args []string, patterns []string) error {
 		return fmt.Errorf("%d/%d checks failed", total-passed, total)
 	}
 	return nil
+}
+
+// quotedList formats patterns as a TOML inline array body: "a", "b", "c".
+func quotedList(patterns []string) string {
+	quoted := make([]string, len(patterns))
+	for i, p := range patterns {
+		quoted[i] = fmt.Sprintf("%q", p)
+	}
+	return strings.Join(quoted, ", ")
 }
 
 func setupTestRepo(dir string) error {

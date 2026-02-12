@@ -67,7 +67,7 @@ func testCheckout(cmd *cobra.Command, dir string, patterns []string) bool {
 	os.Chdir(dir)
 	defer os.Chdir(orig)
 
-	// The temp repo has a .blocklist but no lefthook config or .git/hooks with snag,
+	// The temp repo has a snag.toml but no lefthook config or .git/hooks with snag,
 	// so runCheckout should return an error (correctly detecting missing hooks).
 	err := runCheckout(cmd, nil)
 	return err != nil

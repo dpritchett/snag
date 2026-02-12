@@ -54,7 +54,6 @@ func buildRootCmd() *cobra.Command {
 
 	rootCmd.SetVersionTemplate("snag version {{.Version}}\n")
 
-	rootCmd.PersistentFlags().String("blocklist", ".blocklist", "path to blocklist file")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "suppress non-error output")
 
 	checkCmd := &cobra.Command{

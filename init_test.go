@@ -12,7 +12,6 @@ import (
 func TestRunInit(t *testing.T) {
 	makeCmd := func() *cobra.Command {
 		cmd := buildInitCmd()
-		cmd.PersistentFlags().String("blocklist", ".blocklist", "")
 		cmd.PersistentFlags().BoolP("quiet", "q", true, "")
 		return cmd
 	}
@@ -80,38 +79,11 @@ func TestRunInit(t *testing.T) {
 			t.Error("file was not overwritten")
 		}
 	})
-
-	t.Run("imports existing .blocklist", func(t *testing.T) {
-		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("secretword\nforbidden\n"), 0644)
-
-		orig, _ := os.Getwd()
-		os.Chdir(dir)
-		defer os.Chdir(orig)
-
-		cmd := makeCmd()
-		if err := cmd.RunE(cmd, nil); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		data, _ := os.ReadFile(filepath.Join(dir, "snag.toml"))
-		content := string(data)
-		if !strings.Contains(content, "secretword") {
-			t.Error("should contain patterns from .blocklist")
-		}
-		if !strings.Contains(content, "forbidden") {
-			t.Error("should contain patterns from .blocklist")
-		}
-		if !strings.Contains(content, "min_version") {
-			t.Error("should include min_version")
-		}
-	})
 }
 
 func TestRunInitLocal(t *testing.T) {
 	makeCmd := func() *cobra.Command {
 		cmd := buildInitCmd()
-		cmd.PersistentFlags().String("blocklist", ".blocklist", "")
 		cmd.PersistentFlags().BoolP("quiet", "q", true, "")
 		return cmd
 	}
@@ -138,31 +110,6 @@ func TestRunInitLocal(t *testing.T) {
 		}
 	})
 
-	t.Run("imports .blocklist into local", func(t *testing.T) {
-		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, ".blocklist"), []byte("secretword\nforbidden\n"), 0644)
-
-		orig, _ := os.Getwd()
-		os.Chdir(dir)
-		defer os.Chdir(orig)
-
-		cmd := makeCmd()
-		cmd.Flags().Set("local", "true")
-		if err := cmd.RunE(cmd, nil); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		data, _ := os.ReadFile(filepath.Join(dir, "snag-local.toml"))
-		content := string(data)
-		if !strings.Contains(content, "secretword") {
-			t.Error("should contain patterns from .blocklist")
-		}
-		// Local should NOT have branch patterns
-		if strings.Contains(content, "branch") {
-			t.Error("local config should not include branch patterns")
-		}
-	})
-
 	t.Run("refuses to overwrite local without --force", func(t *testing.T) {
 		dir := t.TempDir()
 		os.WriteFile(filepath.Join(dir, "snag-local.toml"), []byte("existing"), 0644)
@@ -178,22 +125,6 @@ func TestRunInitLocal(t *testing.T) {
 			t.Fatal("expected error when snag-local.toml exists")
 		}
 	})
-}
-
-func TestBuildTOMLFromBlocklist(t *testing.T) {
-	got := buildTOMLFromBlocklist([]string{"secret", "password"})
-	if !strings.Contains(got, `"secret"`) {
-		t.Error("missing pattern 'secret'")
-	}
-	if !strings.Contains(got, `"password"`) {
-		t.Error("missing pattern 'password'")
-	}
-	if !strings.Contains(got, "[block]") {
-		t.Error("missing [block] section")
-	}
-	if !strings.Contains(got, "min_version") {
-		t.Error("missing min_version")
-	}
 }
 
 func TestCompareSemver(t *testing.T) {

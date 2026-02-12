@@ -107,79 +107,30 @@ func compareSemver(a, b string) int {
 	return 0
 }
 
-// configKind tracks which config file type was found during a walk.
-type configKind int
-
-const (
-	configNone      configKind = iota
-	configTOML                 // snag.toml
-	configBlocklist            // .blocklist (legacy)
-)
-
 // walkConfig performs a single-pass walk from dir up to the filesystem root,
-// checking for snag.toml, snag-local.toml, and .blocklist at each level.
-// The first file type found (TOML or .blocklist) sets the mode for the
-// entire walk. snag.toml takes priority over .blocklist when both exist
-// at the same directory level. snag-local.toml is always merged alongside
-// snag.toml (additive, never overrides). Returns the resolved BlockConfig,
-// whether any config was found, and any error.
+// checking for snag.toml and snag-local.toml at each level. Both are merged
+// additively up the tree. Returns the resolved BlockConfig, whether any
+// config was found, and any error.
 func walkConfig(dir string) (*BlockConfig, bool, error) {
 	bc := &BlockConfig{}
-	kind := configNone
 	found := false
 	current := dir
 
 	for {
 		tomlPath := filepath.Join(current, "snag.toml")
 		localPath := filepath.Join(current, "snag-local.toml")
-		blPath := filepath.Join(current, ".blocklist")
 
-		tomlExists := fileExists(tomlPath)
-		localExists := fileExists(localPath)
-		blExists := fileExists(blPath)
-
-		switch kind {
-		case configNone:
-			// Haven't found any config yet — check both, prefer TOML.
-			if tomlExists || localExists {
-				kind = configTOML
-				if tomlExists {
-					if err := mergeTOML(bc, tomlPath); err != nil {
-						return nil, false, err
-					}
-				}
-				if localExists {
-					if err := mergeTOML(bc, localPath); err != nil {
-						return nil, false, err
-					}
-				}
-				found = true
-			} else if blExists {
-				kind = configBlocklist
-				if err := mergeBlocklist(bc, blPath); err != nil {
-					return nil, false, err
-				}
-				found = true
+		if fileExists(tomlPath) {
+			if err := mergeTOML(bc, tomlPath); err != nil {
+				return nil, false, err
 			}
-		case configTOML:
-			// Already in TOML mode — look at snag.toml and snag-local.toml.
-			if tomlExists {
-				if err := mergeTOML(bc, tomlPath); err != nil {
-					return nil, false, err
-				}
+			found = true
+		}
+		if fileExists(localPath) {
+			if err := mergeTOML(bc, localPath); err != nil {
+				return nil, false, err
 			}
-			if localExists {
-				if err := mergeTOML(bc, localPath); err != nil {
-					return nil, false, err
-				}
-			}
-		case configBlocklist:
-			// Already in legacy mode — only look at .blocklist files.
-			if blExists {
-				if err := mergeBlocklist(bc, blPath); err != nil {
-					return nil, false, err
-				}
-			}
+			found = true
 		}
 
 		parent := filepath.Dir(current)
@@ -226,68 +177,20 @@ func (bc *BlockConfig) pushOrNil() []string {
 	return nil
 }
 
-// mergeBlocklist reads a legacy .blocklist and feeds the same patterns to Diff, Msg, and Push.
-func mergeBlocklist(bc *BlockConfig, path string) error {
-	patterns, err := loadBlocklist(path)
-	if err != nil {
-		return fmt.Errorf("loading %s: %w", path, err)
-	}
-	bc.Diff = append(bc.Diff, patterns...)
-	bc.Msg = append(bc.Msg, patterns...)
-	// In legacy mode, Push gets the same patterns (not nil — explicitly set).
-	if len(patterns) > 0 {
-		if bc.Push == nil {
-			bc.Push = []string{}
-		}
-		bc.Push = append(bc.Push, patterns...)
-	}
-	return nil
-}
-
 // resolveBlockConfig builds the per-hook BlockConfig using all config sources.
 //
 // Precedence:
-//  1. --blocklist flag → legacy mode, flat shared patterns (overrides walk)
-//  2. snag.toml walk (CWD → root, additive merge) — OR .blocklist walk (fallback)
-//  3. SNAG_BLOCKLIST env var → always merges into Diff/Msg/Push
-//  4. SNAG_PROTECTED_BRANCHES env var → always merges into Branch
-//  5. Default protected branches ["main", "master"] → only when Branch is still empty
+//  1. snag.toml walk (CWD → root, additive merge of snag.toml + snag-local.toml)
+//  2. SNAG_PROTECTED_BRANCHES env var → always merges into Branch
+//  3. Default protected branches ["main", "master"] → only when Branch is still empty
 func resolveBlockConfig(cmd *cobra.Command) (*BlockConfig, error) {
-	bc := &BlockConfig{}
-
-	if cmd.Flags().Changed("blocklist") {
-		// Explicit flag: legacy mode — flat shared patterns.
-		path, _ := cmd.Flags().GetString("blocklist")
-		patterns, err := loadBlocklist(path)
-		if err != nil {
-			return nil, fmt.Errorf("loading blocklist: %w", err)
-		}
-		bc.Diff = patterns
-		bc.Msg = patterns
-		bc.Push = patterns // explicitly set, not nil
-	} else {
-		// Walk from CWD for snag.toml or .blocklist.
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("getting working directory: %w", err)
-		}
-		walked, _, err := walkConfig(cwd)
-		if err != nil {
-			return nil, err
-		}
-		bc = walked
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("getting working directory: %w", err)
 	}
-
-	// Overlay SNAG_BLOCKLIST env var into content-checking hooks.
-	envPatterns := loadEnvBlocklist()
-	if len(envPatterns) > 0 {
-		bc.Diff = append(bc.Diff, envPatterns...)
-		bc.Msg = append(bc.Msg, envPatterns...)
-		if bc.Push == nil {
-			// Don't force Push to non-nil just from env; it will fall back to Diff+Msg union.
-		} else {
-			bc.Push = append(bc.Push, envPatterns...)
-		}
+	bc, _, err := walkConfig(cwd)
+	if err != nil {
+		return nil, err
 	}
 
 	// Overlay SNAG_PROTECTED_BRANCHES env var into Branch.

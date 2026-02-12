@@ -21,7 +21,7 @@ func buildConfigCmd() *cobra.Command {
 // configSource pairs a source label with the patterns it contributes.
 type configSource struct {
 	Label  string
-	Kind   string // "toml", "blocklist", "env", "default"
+	Kind   string // "toml", "env", "default"
 	Diff   []string
 	Msg    []string
 	Push   *[]string // nil = not set
@@ -53,13 +53,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 				printSection("push", *src.Push)
 			}
 			printSection("branch", src.Branch)
-		case "blocklist":
-			// Legacy: same list for all hooks
-			if len(src.Diff) > 0 {
-				printSection("patterns", src.Diff)
-			}
 		case "env":
-			printSection("patterns", src.Diff)
 			printSection("branch", src.Branch)
 		case "default":
 			printSection("branch", src.Branch)
@@ -93,38 +87,11 @@ func printSection(name string, patterns []string) {
 func collectSources(cmd *cobra.Command) ([]configSource, error) {
 	var sources []configSource
 
-	if cmd.Flags().Changed("blocklist") {
-		path, _ := cmd.Flags().GetString("blocklist")
-		abs, _ := filepath.Abs(path)
-		patterns, err := loadBlocklist(path)
-		if err != nil {
-			return nil, fmt.Errorf("loading blocklist: %w", err)
-		}
-		if len(patterns) > 0 {
-			sources = append(sources, configSource{
-				Label: abs,
-				Kind:  "blocklist",
-				Diff:  patterns,
-				Msg:   patterns,
-			})
-		}
-	} else {
-		fileSources, err := walkConfigSources()
-		if err != nil {
-			return nil, err
-		}
-		sources = append(sources, fileSources...)
+	fileSources, err := walkConfigSources()
+	if err != nil {
+		return nil, err
 	}
-
-	// SNAG_BLOCKLIST env var
-	envPatterns := loadEnvBlocklist()
-	if len(envPatterns) > 0 {
-		sources = append(sources, configSource{
-			Label: "SNAG_BLOCKLIST",
-			Kind:  "env",
-			Diff:  envPatterns,
-		})
-	}
+	sources = append(sources, fileSources...)
 
 	// SNAG_PROTECTED_BRANCHES env var
 	if env := os.Getenv("SNAG_PROTECTED_BRANCHES"); env != "" {
@@ -171,66 +138,24 @@ func walkConfigSources() ([]configSource, error) {
 	}
 
 	var sources []configSource
-	kind := configNone
 	current := cwd
 
 	for {
 		tomlPath := filepath.Join(current, "snag.toml")
 		localPath := filepath.Join(current, "snag-local.toml")
-		blPath := filepath.Join(current, ".blocklist")
 
-		tomlExists := fileExists(tomlPath)
-		localExists := fileExists(localPath)
-		blExists := fileExists(blPath)
-
-		switch kind {
-		case configNone:
-			if tomlExists || localExists {
-				kind = configTOML
-				if tomlExists {
-					if src, err := tomlSource(tomlPath); err != nil {
-						return nil, err
-					} else if src != nil {
-						sources = append(sources, *src)
-					}
-				}
-				if localExists {
-					if src, err := tomlSource(localPath); err != nil {
-						return nil, err
-					} else if src != nil {
-						sources = append(sources, *src)
-					}
-				}
-			} else if blExists {
-				kind = configBlocklist
-				if src, err := blocklistSource(blPath); err != nil {
-					return nil, err
-				} else if src != nil {
-					sources = append(sources, *src)
-				}
+		if fileExists(tomlPath) {
+			if src, err := tomlSource(tomlPath); err != nil {
+				return nil, err
+			} else if src != nil {
+				sources = append(sources, *src)
 			}
-		case configTOML:
-			if tomlExists {
-				if src, err := tomlSource(tomlPath); err != nil {
-					return nil, err
-				} else if src != nil {
-					sources = append(sources, *src)
-				}
-			}
-			if localExists {
-				if src, err := tomlSource(localPath); err != nil {
-					return nil, err
-				} else if src != nil {
-					sources = append(sources, *src)
-				}
-			}
-		case configBlocklist:
-			if blExists {
-				if src, err := blocklistSource(blPath); err != nil {
-					return nil, err
-				} else if src != nil {
-					sources = append(sources, *src)
-				}
+		}
+		if fileExists(localPath) {
+			if src, err := tomlSource(localPath); err != nil {
+				return nil, err
+			} else if src != nil {
+				sources = append(sources, *src)
 			}
 		}
 
@@ -263,21 +188,4 @@ func tomlSource(path string) (*configSource, error) {
 		return nil, nil
 	}
 	return src, nil
-}
-
-func blocklistSource(path string) (*configSource, error) {
-	patterns, err := loadBlocklist(path)
-	if err != nil {
-		return nil, fmt.Errorf("loading %s: %w", path, err)
-	}
-	if len(patterns) == 0 {
-		return nil, nil
-	}
-	abs, _ := filepath.Abs(path)
-	return &configSource{
-		Label: abs,
-		Kind:  "blocklist",
-		Diff:  patterns,
-		Msg:   patterns,
-	}, nil
 }

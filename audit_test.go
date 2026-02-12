@@ -12,15 +12,15 @@ func TestAudit_CleanHistory(t *testing.T) {
 	initialCommit(t, dir)
 	commitFile(t, dir, "a.txt", "hello\n", "add greeting")
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("secret\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"secret\"]\nmsg = [\"secret\"]\n"), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"audit", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"audit"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for clean history, got: %v", err)
@@ -32,15 +32,15 @@ func TestAudit_MessageViolation(t *testing.T) {
 	initialCommit(t, dir)
 	commitFile(t, dir, "a.txt", "clean content\n", "fixup! this is bad")
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("fixup!\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg = [\"fixup!\"]\n"), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"audit", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"audit"})
 	err := rootCmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for message violation")
@@ -55,15 +55,15 @@ func TestAudit_DiffViolation(t *testing.T) {
 	initialCommit(t, dir)
 	commitFile(t, dir, "a.txt", "this is a HACK\n", "add file")
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\n"), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"audit", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"audit"})
 	err := rootCmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for diff violation")
@@ -119,8 +119,8 @@ func TestAudit_LimitFlag(t *testing.T) {
 	commitFile(t, dir, "d.txt", "clean\n", "add file d")
 	commitFile(t, dir, "e.txt", "clean\n", "add file e")
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\n"), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
@@ -128,7 +128,7 @@ func TestAudit_LimitFlag(t *testing.T) {
 
 	// Limit to 3 — should only scan the 3 most recent, all clean.
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"audit", "--blocklist", blPath, "--limit", "3"})
+	rootCmd.SetArgs([]string{"audit", "--limit", "3"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected no error with --limit 3 (violation is older), got: %v", err)
@@ -136,7 +136,7 @@ func TestAudit_LimitFlag(t *testing.T) {
 
 	// Limit to 0 (unlimited) — should find the violation.
 	rootCmd2 := buildRootCmd()
-	rootCmd2.SetArgs([]string{"audit", "--blocklist", blPath, "--limit", "0"})
+	rootCmd2.SetArgs([]string{"audit", "--limit", "0"})
 	err = rootCmd2.Execute()
 	if err == nil {
 		t.Fatal("expected error with --limit 0 (scan all, violation exists)")
@@ -147,15 +147,15 @@ func TestAudit_EmptyRepo(t *testing.T) {
 	dir := initGitRepo(t)
 	// No commits at all — just git init.
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\n"), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(oldDir)
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"audit", "--blocklist", blPath})
+	rootCmd.SetArgs([]string{"audit"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for empty repo, got: %v", err)
@@ -191,8 +191,8 @@ func TestAudit_QuietMode(t *testing.T) {
 	initialCommit(t, dir)
 	commitFile(t, dir, "a.txt", "this is a HACK\n", "add file")
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\n"), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
@@ -203,7 +203,7 @@ func TestAudit_QuietMode(t *testing.T) {
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"audit", "--blocklist", blPath, "-q"})
+	rootCmd.SetArgs([]string{"audit", "-q"})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -228,8 +228,8 @@ func TestAudit_ExplicitRange(t *testing.T) {
 	commitFile(t, dir, "a.txt", "this is a HACK\n", "add file a")
 	commitFile(t, dir, "b.txt", "clean\n", "add file b")
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\n"), 0644)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(dir)
@@ -237,7 +237,7 @@ func TestAudit_ExplicitRange(t *testing.T) {
 
 	// Range covering only the last commit (which is clean).
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"audit", "--blocklist", blPath, "HEAD~1..HEAD"})
+	rootCmd.SetArgs([]string{"audit", "HEAD~1..HEAD"})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected no error for range with only clean commit, got: %v", err)
@@ -245,7 +245,7 @@ func TestAudit_ExplicitRange(t *testing.T) {
 
 	// Range covering both commits (violation in older one).
 	rootCmd2 := buildRootCmd()
-	rootCmd2.SetArgs([]string{"audit", "--blocklist", blPath, "HEAD~2..HEAD"})
+	rootCmd2.SetArgs([]string{"audit", "HEAD~2..HEAD"})
 	err = rootCmd2.Execute()
 	if err == nil {
 		t.Fatal("expected error for range including violation commit")

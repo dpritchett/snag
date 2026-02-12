@@ -60,36 +60,21 @@ func TestStripMatchingTrailers_PartialMatch(t *testing.T) {
 	}
 }
 
-func TestRunMsg_MissingBlocklist(t *testing.T) {
-	dir := t.TempDir()
-
-	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
-	os.WriteFile(msgFile, []byte("fix bug\n"), 0644)
-
-	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", filepath.Join(dir, "no-such-file"), msgFile})
-	err := rootCmd.Execute()
-	if err != nil {
-		t.Fatalf("expected nil error for missing blocklist, got: %v", err)
-	}
-
-	got, _ := os.ReadFile(msgFile)
-	if string(got) != "fix bug\n" {
-		t.Errorf("file should be unchanged, got: %q", got)
-	}
-}
-
 func TestRunMsg_CleanMessage(t *testing.T) {
 	dir := t.TempDir()
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("hack\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg = [\"hack\"]\n"), 0644)
 
 	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
 	os.WriteFile(msgFile, []byte("fix bug\n"), 0644)
 
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected nil error for clean message, got: %v", err)
@@ -99,18 +84,22 @@ func TestRunMsg_CleanMessage(t *testing.T) {
 func TestRunMsg_TrailerStripped(t *testing.T) {
 	dir := t.TempDir()
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("bot\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg = [\"bot\"]\n"), 0644)
 
 	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
 	os.WriteFile(msgFile, []byte("fix bug\n\nSigned-off-by: Bot\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
 
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -136,18 +125,22 @@ func TestRunMsg_TrailerStripped(t *testing.T) {
 func TestRunMsg_TrailerStrippedThenBodyMatch(t *testing.T) {
 	dir := t.TempDir()
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("bot\nfixme\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg = [\"bot\", \"fixme\"]\n"), 0644)
 
 	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
 	os.WriteFile(msgFile, []byte("TODO fixme later\n\nSigned-off-by: Bot\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
 
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
 	err := rootCmd.Execute()
 
 	w.Close()
@@ -183,18 +176,22 @@ func TestRunMsg_TrailerStrippedThenBodyMatch(t *testing.T) {
 func TestRunMsg_BodyMatch(t *testing.T) {
 	dir := t.TempDir()
 
-	blPath := filepath.Join(dir, ".blocklist")
-	os.WriteFile(blPath, []byte("todo\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg = [\"todo\"]\n"), 0644)
 
 	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
 	os.WriteFile(msgFile, []byte("TODO fix this later\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
 
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
 	rootCmd := buildRootCmd()
-	rootCmd.SetArgs([]string{"check", "msg", "--blocklist", blPath, msgFile})
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
 	err := rootCmd.Execute()
 
 	w.Close()

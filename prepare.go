@@ -56,7 +56,7 @@ func runPrepare(cmd *cobra.Command, args []string) error {
 }
 
 func testPrepare(cmd *cobra.Command, dir string, patterns []string) bool {
-	// Write a commit message file that contains a blocklist violation,
+	// Write a commit message file that contains a pattern violation,
 	// as if git auto-populated it (e.g. merge or template).
 	violation := fmt.Sprintf("Merge branch 'feature-%s-integration'\n", patterns[0])
 	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
