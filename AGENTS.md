@@ -50,6 +50,7 @@ All production code lives in the package `main` at the repo root.
 2. `SNAG_PROTECTED_BRANCHES` env var → always merges into Branch
 3. Default protected branches `["main", "master"]` → only when Branch is still empty
 4. Lowercase Diff/Msg/Push; preserve Branch case; deduplicate all lists
+5. `SNAG_IGNORE` env var → removes patterns or clears entire phases after deduplication. Comma-separated entries: `<phase>` clears the phase, `<phase>:<pattern>` removes one pattern. Phases: `diff`, `msg`, `push`, `branch`
 
 ## Testing Patterns
 

@@ -11,8 +11,13 @@ import (
 
 func buildConfigCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "config",
-		Short:        "Show resolved block patterns and their sources",
+		Use:   "config",
+		Short: "Show resolved block patterns and their sources",
+		Long: `Show resolved block patterns and their sources.
+
+Displays each config source (snag.toml files, env vars, defaults) and the
+patterns it contributes. Patterns suppressed by SNAG_IGNORE are shown with
+a ~ prefix.`,
 		SilenceUsage: true,
 		RunE:         runConfig,
 	}
@@ -57,6 +62,13 @@ func runConfig(cmd *cobra.Command, args []string) error {
 			printSection("branch", src.Branch)
 		case "default":
 			printSection("branch", src.Branch)
+		case "ignore":
+			printIgnoreSection("diff", src.Diff)
+			printIgnoreSection("msg", src.Msg)
+			if src.Push != nil {
+				printIgnoreSection("push", *src.Push)
+			}
+			printIgnoreSection("branch", src.Branch)
 		}
 	}
 
@@ -108,6 +120,14 @@ func collectSources(cmd *cobra.Command) ([]configSource, error) {
 				Kind:   "env",
 				Branch: branches,
 			})
+		}
+	}
+
+	// SNAG_IGNORE env var
+	if env := os.Getenv("SNAG_IGNORE"); env != "" {
+		src := parseIgnoreSource(env)
+		if src != nil {
+			sources = append(sources, *src)
 		}
 	}
 
@@ -188,4 +208,57 @@ func tomlSource(path string) (*configSource, error) {
 		return nil, nil
 	}
 	return src, nil
+}
+
+func printIgnoreSection(name string, patterns []string) {
+	if len(patterns) == 0 {
+		return
+	}
+	prefixed := make([]string, len(patterns))
+	for i, p := range patterns {
+		prefixed[i] = "~" + p
+	}
+	fmt.Printf("  %-8s %s\n", name+":", strings.Join(prefixed, ", "))
+}
+
+// parseIgnoreSource builds a configSource from a SNAG_IGNORE value.
+// Phase-only entries (e.g. "diff") are represented as a single "*" pattern.
+func parseIgnoreSource(env string) *configSource {
+	src := &configSource{
+		Label: "SNAG_IGNORE",
+		Kind:  "ignore",
+	}
+	for _, entry := range strings.Split(env, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		phase, pattern, hasPattern := strings.Cut(entry, ":")
+		phase = strings.ToLower(phase)
+		if hasPattern {
+			pattern = strings.ToLower(strings.TrimSpace(pattern))
+		} else {
+			pattern = "*"
+		}
+
+		switch phase {
+		case "diff":
+			src.Diff = append(src.Diff, pattern)
+		case "msg":
+			src.Msg = append(src.Msg, pattern)
+		case "push":
+			if src.Push == nil {
+				p := []string{}
+				src.Push = &p
+			}
+			*src.Push = append(*src.Push, pattern)
+		case "branch":
+			src.Branch = append(src.Branch, pattern)
+		}
+	}
+	// Skip if nothing was parsed
+	if len(src.Diff) == 0 && len(src.Msg) == 0 && src.Push == nil && len(src.Branch) == 0 {
+		return nil
+	}
+	return src
 }

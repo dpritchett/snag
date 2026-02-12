@@ -50,6 +50,18 @@ func buildRootCmd() *cobra.Command {
 		Use:     "snag",
 		Short:   fmt.Sprintf("snag %s — Composable git hook policy kit", Version),
 		Version: Version,
+		Long: fmt.Sprintf(`snag %s — Composable git hook policy kit
+
+Environment variables:
+  SNAG_PROTECTED_BRANCHES   Comma-separated branch names to merge into the
+                            protected branches list (e.g. "develop,staging")
+  SNAG_IGNORE               Comma-separated entries to suppress specific phases
+                            or patterns. Each entry is <phase> or <phase>:<pattern>.
+                            Phases: diff, msg, push, branch.
+                            Examples:
+                              SNAG_IGNORE=diff              skip all diff patterns
+                              SNAG_IGNORE=diff:hack         skip only "hack" in diff
+                              SNAG_IGNORE=diff:hack,msg:wip skip specific patterns`, Version),
 	}
 
 	rootCmd.SetVersionTemplate("snag version {{.Version}}\n")

@@ -267,6 +267,7 @@ func TestResolveBlockConfig(t *testing.T) {
 	makeCmd := func() *cobra.Command {
 		return &cobra.Command{}
 	}
+	t.Setenv("SNAG_IGNORE", "")
 
 	t.Run("pure TOML config", func(t *testing.T) {
 		dir := t.TempDir()
@@ -412,6 +413,151 @@ diff = ["HACK", "hack", "HACK"]
 		}
 		if len(bc.Diff) != 1 {
 			t.Errorf("diff: got %v, want 1 (deduplicated)", bc.Diff)
+		}
+	})
+
+	t.Run("SNAG_IGNORE removes specific pattern", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[block]
+diff = ["HACK", "FIXME", "TODO"]
+msg  = ["WIP"]
+`), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
+		t.Setenv("SNAG_IGNORE", "diff:hack")
+
+		bc, err := resolveBlockConfig(makeCmd())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// "hack" should be removed, "fixme" and "todo" remain
+		if len(bc.Diff) != 2 {
+			t.Errorf("diff: got %v, want 2 patterns (fixme, todo)", bc.Diff)
+		}
+		for _, p := range bc.Diff {
+			if p == "hack" {
+				t.Errorf("diff should not contain 'hack', got %v", bc.Diff)
+			}
+		}
+		// msg untouched
+		if len(bc.Msg) != 1 || bc.Msg[0] != "wip" {
+			t.Errorf("msg: got %v, want [wip]", bc.Msg)
+		}
+	})
+
+	t.Run("SNAG_IGNORE clears entire phase", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[block]
+diff = ["HACK", "FIXME"]
+msg  = ["WIP"]
+`), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
+		t.Setenv("SNAG_IGNORE", "diff")
+
+		bc, err := resolveBlockConfig(makeCmd())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(bc.Diff) != 0 {
+			t.Errorf("diff: got %v, want empty", bc.Diff)
+		}
+		// msg untouched
+		if len(bc.Msg) != 1 || bc.Msg[0] != "wip" {
+			t.Errorf("msg: got %v, want [wip]", bc.Msg)
+		}
+	})
+
+	t.Run("SNAG_IGNORE multiple entries", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[block]
+diff = ["HACK", "FIXME"]
+msg  = ["WIP", "DO NOT MERGE"]
+`), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
+		t.Setenv("SNAG_IGNORE", "diff:hack,msg:wip")
+
+		bc, err := resolveBlockConfig(makeCmd())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(bc.Diff) != 1 || bc.Diff[0] != "fixme" {
+			t.Errorf("diff: got %v, want [fixme]", bc.Diff)
+		}
+		if len(bc.Msg) != 1 || bc.Msg[0] != "do not merge" {
+			t.Errorf("msg: got %v, want [do not merge]", bc.Msg)
+		}
+	})
+
+	t.Run("SNAG_IGNORE phase+pattern combo", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[block]
+diff = ["HACK", "FIXME"]
+msg  = ["WIP", "DO NOT MERGE"]
+`), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
+		t.Setenv("SNAG_IGNORE", "diff,msg:wip")
+
+		bc, err := resolveBlockConfig(makeCmd())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// diff entirely cleared
+		if len(bc.Diff) != 0 {
+			t.Errorf("diff: got %v, want empty", bc.Diff)
+		}
+		// only "wip" removed from msg
+		if len(bc.Msg) != 1 || bc.Msg[0] != "do not merge" {
+			t.Errorf("msg: got %v, want [do not merge]", bc.Msg)
+		}
+	})
+
+	t.Run("SNAG_IGNORE empty is no-op", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[block]
+diff = ["HACK"]
+msg  = ["WIP"]
+`), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
+		t.Setenv("SNAG_IGNORE", "")
+
+		bc, err := resolveBlockConfig(makeCmd())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(bc.Diff) != 1 || bc.Diff[0] != "hack" {
+			t.Errorf("diff: got %v, want [hack]", bc.Diff)
+		}
+		if len(bc.Msg) != 1 || bc.Msg[0] != "wip" {
+			t.Errorf("msg: got %v, want [wip]", bc.Msg)
 		}
 	})
 

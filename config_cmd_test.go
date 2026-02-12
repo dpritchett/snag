@@ -14,6 +14,7 @@ func TestCollectSources(t *testing.T) {
 		cmd.Flags().BoolP("quiet", "q", false, "")
 		return cmd
 	}
+	t.Setenv("SNAG_IGNORE", "")
 
 	t.Run("snag.toml source", func(t *testing.T) {
 		dir := t.TempDir()
@@ -143,6 +144,39 @@ branch = ["main"]
 		// Should still have default branches
 		if len(sources) != 1 || sources[0].Kind != "default" {
 			t.Errorf("expected only default source, got %v", sources)
+		}
+	})
+
+	t.Run("SNAG_IGNORE source", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[block]
+diff = ["HACK", "FIXME"]
+msg  = ["WIP"]
+branch = ["main"]
+`), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
+		t.Setenv("SNAG_IGNORE", "diff:hack")
+
+		sources, err := collectSources(makeCmd())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		ignoreCount := 0
+		for _, s := range sources {
+			if s.Kind == "ignore" {
+				ignoreCount++
+				if len(s.Diff) != 1 || s.Diff[0] != "hack" {
+					t.Errorf("ignore diff: got %v, want [hack]", s.Diff)
+				}
+			}
+		}
+		if ignoreCount != 1 {
+			t.Errorf("expected 1 ignore source, got %d", ignoreCount)
 		}
 	})
 }

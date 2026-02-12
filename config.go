@@ -223,7 +223,70 @@ func resolveBlockConfig(cmd *cobra.Command) (*BlockConfig, error) {
 	}
 	bc.Branch = deduplicatePatterns(bc.Branch)
 
+	// Apply SNAG_IGNORE suppressions.
+	if env := os.Getenv("SNAG_IGNORE"); env != "" {
+		applyIgnore(bc, env)
+	}
+
 	return bc, nil
+}
+
+// applyIgnore parses the SNAG_IGNORE value and removes matching patterns from bc.
+// Entries are comma-separated. Each entry is either "<phase>" (clear entire phase)
+// or "<phase>:<pattern>" (remove one pattern). Phase names: diff, msg, push, branch.
+// Matching is case-insensitive.
+func applyIgnore(bc *BlockConfig, ignoreStr string) {
+	for _, entry := range strings.Split(ignoreStr, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		phase, pattern, hasPattern := strings.Cut(entry, ":")
+		phase = strings.ToLower(phase)
+		if hasPattern {
+			pattern = strings.ToLower(strings.TrimSpace(pattern))
+		}
+
+		switch phase {
+		case "diff":
+			if hasPattern {
+				bc.Diff = removePattern(bc.Diff, pattern)
+			} else {
+				bc.Diff = nil
+			}
+		case "msg":
+			if hasPattern {
+				bc.Msg = removePattern(bc.Msg, pattern)
+			} else {
+				bc.Msg = nil
+			}
+		case "push":
+			if hasPattern {
+				if bc.Push != nil {
+					bc.Push = removePattern(bc.Push, pattern)
+				}
+			} else {
+				bc.Push = nil
+			}
+		case "branch":
+			if hasPattern {
+				bc.Branch = removePattern(bc.Branch, pattern)
+			} else {
+				bc.Branch = nil
+			}
+		}
+	}
+}
+
+// removePattern returns a new slice with all occurrences of target removed.
+func removePattern(patterns []string, target string) []string {
+	out := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		if strings.ToLower(p) != target {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // lowercaseAll returns a new slice with all strings lowercased.
