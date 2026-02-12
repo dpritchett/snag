@@ -41,6 +41,7 @@ All production code lives in the package `main` at the repo root.
 | `prepare.go` | Prepare-commit-msg: checks auto-generated commit messages (merge, template, amend) against patterns. Skips `-m` messages (commit-msg handles those) |
 | `rebase.go` | Pre-rebase: blocks rebase of protected branches (main, master by default). Override via `SNAG_PROTECTED_BRANCHES` env var |
 | `audit.go` | `snag audit` — scans git history for policy violations. Checks commit messages against `bc.Msg` and diffs against `bc.Diff`. Reports all matches grouped by commit. Supports `--limit N` and explicit revision ranges |
+| `shell.go` | `snag shell <bash\|fish\|zsh>` — emits shell-specific hooks that warn on `cd` into repos where snag config exists but hooks aren't installed. Uses a `shellHook` interface with per-stage methods; `renderHook()` assembles them. Adding a shell or stage is compiler-enforced |
 | `install_hooks.go` | `snag install` — adds/updates snag remote in lefthook config. Reads YAML to understand structure, writes via string append/replace to preserve formatting |
 
 **Data flow:** git hook → `snag check <subcommand>` → `resolveBlockConfig` (walk up for `snag.toml` files + env vars) → shell out to git → per-hook pattern match → exit code (0 = clean, 1 = violation).
