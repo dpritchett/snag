@@ -69,6 +69,7 @@ snag's own repo uses `lefthook.yml` to dogfood via `go run .`.
 
 ## Key Design Decisions
 
+- **Policy engine must stay hook-runner-agnostic.** The check commands (`diff.go`, `msg.go`, `push.go`, `prepare.go`, `rebase.go`), config (`config.go`, `snag.toml`), and pattern matching (`patterns.go`) must never reference lefthook, husky, pre-commit, or any other hook runner. Runner-specific code is confined to `install_hooks.go` (installation), `checkout.go` (detection), and `shell.go` (nudge hooks). If a new file needs runner awareness, that's a design smell. See #41.
 - `snag.toml` is version-controlled team policy
 - `snag-local.toml` is gitignored, personal/sensitive patterns — additive overlay alongside `snag.toml` at each directory level
 - Sensitive patterns belong in `snag-local.toml`, not in committed config
