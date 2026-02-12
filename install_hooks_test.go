@@ -67,8 +67,8 @@ func TestInstallHooks_AddsRemote(t *testing.T) {
 	if !strings.Contains(content, "github.com/dpritchett/snag") {
 		t.Error("expected snag remote in lefthook.yml")
 	}
-	if !strings.Contains(content, "recipes/lefthook-blocklist.yml") {
-		t.Error("expected blocklist recipe in lefthook.yml")
+	if !strings.Contains(content, "recipes/lefthook-snag-filter.yml") {
+		t.Error("expected snag-filter recipe in lefthook.yml")
 	}
 	// Original content must be preserved verbatim.
 	if !strings.HasPrefix(content, initial) {
@@ -92,7 +92,7 @@ remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: v0.1.0
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
 `
 	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
 
@@ -134,7 +134,7 @@ remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: ` + Version + `
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
 `
 	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
 
@@ -164,7 +164,7 @@ func TestInstallHooks_DetectsExistingInLocal(t *testing.T) {
   - git_url: https://github.com/dpritchett/snag.git
     ref: v0.1.0
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
 `
 	os.WriteFile(filepath.Join(dir, "lefthook-local.yml"), []byte(localContent), 0644)
 
@@ -206,13 +206,13 @@ remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: v0.1.0
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
 `
 	localContent := `remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: v0.2.0
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
 `
 	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(sharedContent), 0644)
 	os.WriteFile(filepath.Join(dir, "lefthook-local.yml"), []byte(localContent), 0644)
@@ -421,7 +421,7 @@ remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: v0.1.0
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
 `
 	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte(initial), 0644)
 

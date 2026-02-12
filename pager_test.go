@@ -36,7 +36,7 @@ func TestUnifiedDiff_AppendBlock(t *testing.T) {
 }
 
 func TestUnifiedDiff_SingleLineChange(t *testing.T) {
-	old := "remotes:\n  - git_url: https://example.com\n    ref: v0.1.0\n    configs:\n      - recipes/blocklist.yml\n"
+	old := "remotes:\n  - git_url: https://example.com\n    ref: v0.1.0\n    configs:\n      - recipes/snag-filter.yml\n"
 	new := strings.Replace(old, "ref: v0.1.0", "ref: v0.5.0", 1)
 	diff := unifiedDiff("lefthook.yml", old, new)
 

@@ -22,8 +22,7 @@ snag is that project, kept small on purpose.
   [lefthook remotes](https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md#remotes).
 
 - **A small Go CLI** (`snag`) for per-repo content policy enforcement via
-  `snag.toml` (or legacy `.blocklist`). For checks where no good off-the-shelf
-  tool exists yet.
+  `snag.toml`. For checks where no good off-the-shelf tool exists yet.
 
 ## Install
 
@@ -47,7 +46,7 @@ Pre-built binaries are available on the
 ### Recipe-only usage
 
 If you only want the lefthook recipes (gitleaks, shellcheck, Go checks) and
-don't need the `.blocklist` CLI, you don't need to install the binary at all —
+don't need the snag CLI, you don't need to install the binary at all —
 just point your lefthook remotes at this repo.
 
 ## Quick start
@@ -67,19 +66,20 @@ remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: v0.4.3
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
       - recipes/lefthook-gitleaks.yml
 ```
 
-Add a `.blocklist` to your repo root (or a parent directory):
+Add a `snag.toml` to your repo root:
 
-```
-# Patterns to deny (case-insensitive substring match)
-TODO
-HACK
-DO NOT MERGE
-fixme
-WIP
+```toml
+# snag.toml — committed, version-controlled team policy
+min_version = "0.10.0"
+
+[block]
+diff = ["TODO", "HACK", "DO NOT MERGE"]
+msg  = ["WIP", "fixup!", "squash!"]
+branch = ["main", "master"]
 ```
 
 Run `lefthook install` and you're set.
@@ -88,7 +88,7 @@ Run `lefthook install` and you're set.
 
 | Recipe | Hook phase(s) | What it does | Requires |
 |---|---|---|---|
-| `lefthook-blocklist.yml` | pre-commit, commit-msg, pre-push | Content policy via `.blocklist` | `snag` CLI |
+| `lefthook-snag-filter.yml` | pre-commit, commit-msg, pre-push | Content policy via `snag.toml` | `snag` CLI |
 | `lefthook-gitleaks.yml` | pre-commit | Secret scanning | `gitleaks` |
 | `lefthook-go.yml` | pre-commit | `go fmt`, `go vet`, `go test` | Go toolchain |
 | `lefthook-shellcheck.yml` | pre-commit | Lint staged shell scripts | `shellcheck` |
@@ -103,12 +103,12 @@ remote config automatically.
 ### More lefthook examples
 
 ```yaml
-# JS project — blocklist + gitleaks only
+# JS project — snag-filter + gitleaks only
 remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: main
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
       - recipes/lefthook-gitleaks.yml
 ```
 
@@ -118,7 +118,7 @@ remotes:
   - git_url: https://github.com/dpritchett/snag.git
     ref: main
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
       - recipes/lefthook-gitleaks.yml
       - recipes/lefthook-go.yml
 ```
@@ -138,10 +138,7 @@ All three perform case-insensitive substring matching and exit 0 (clean) or 1
 (match found, with a human-readable error).
 
 By default, snag walks up from the current directory to the filesystem root,
-loading every `.blocklist` it finds and merging all patterns. A parent directory
-blocklist protects every repo underneath it — no per-repo setup required.
-
-If `--blocklist` is passed explicitly, only that file is used (no walk).
+loading every `snag.toml` it finds and merging all patterns.
 
 ### `snag install`
 
@@ -169,7 +166,7 @@ snag: match "do not merge" in staged diff
 ### `snag check msg`
 
 Two-pass approach: first strips git trailer lines (`Key: Value`) matching the
-blocklist, rewriting the file in place. Then checks the remaining message body.
+pattern list, rewriting the file in place. Then checks the remaining message body.
 
 ```
 $ snag check msg .git/COMMIT_EDITMSG
@@ -225,30 +222,9 @@ snag audit -q                 # summary line + exit code only
 ### Flags
 
 ```
---blocklist PATH    # use only this blocklist file (disables directory walk)
 --quiet             # suppress informational output
 --version           # print version and exit
 ```
-
-### Environment variables
-
-```
-SNAG_BLOCKLIST      # extra patterns, colon or newline separated, always merged
-```
-
-```bash
-# single line — colon-separated
-export SNAG_BLOCKLIST="secretword:codename:do not merge"
-
-# multi-line also works (same format as a .blocklist file)
-export SNAG_BLOCKLIST="secretword
-codename
-do not merge"
-```
-
-`SNAG_BLOCKLIST` is additive — its patterns are merged on top of whatever the
-directory walk (or explicit `--blocklist`) found. Handy for CI, shell rc files,
-direnv, or mise.
 
 ### Color output
 
@@ -332,14 +308,6 @@ accumulate as snag walks up to the filesystem root:
 ~/projects/acme/api/service/         ← no config here, protected by all above
 ```
 
-### Legacy `.blocklist` format
-
-Still supported as a fallback. When `snag.toml` exists at any level, `.blocklist`
-files are ignored entirely (clean cutover).
-
-Unlike `snag.toml`, a `.blocklist` feeds the same patterns to all hooks — no
-per-phase separation. See the Quick start section above for an example.
-
 snag ships no default patterns — that's a policy decision, not a tool decision.
 
 ## Hook runner examples
@@ -352,17 +320,17 @@ works anywhere:
 ```yaml
 pre-commit:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check diff
 
 commit-msg:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check msg {1}
 
 pre-push:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check push
 ```
 
@@ -388,7 +356,7 @@ repos:
   - repo: local
     hooks:
       - id: snag-diff
-        name: snag blocklist
+        name: snag content filter
         entry: snag check diff
         language: system
         stages: [pre-commit]
@@ -418,8 +386,8 @@ If you use direnv, add a canary check to `.envrc` so you never forget to wire
 up hooks:
 
 ```bash
-if [ -f .blocklist ] && ! [ -f lefthook.yml ]; then
-  printf '\033[33m!! %s has a .blocklist but no lefthook.yml\033[0m\n' \
+if [ -f snag.toml ] && ! [ -f lefthook.yml ]; then
+  printf '\033[33m!! %s has a snag.toml but no lefthook.yml\033[0m\n' \
     "$(basename "$PWD")"
 elif [ -f lefthook.yml ] && \
      ! grep -q lefthook .git/hooks/pre-commit 2>/dev/null; then

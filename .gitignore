@@ -3,7 +3,6 @@
 
 # Local/sensitive policy — never commit these
 snag-local.toml
-.blocklist
 
 # GoReleaser
 dist/

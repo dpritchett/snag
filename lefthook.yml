@@ -1,7 +1,7 @@
 pre-commit:
   parallel: true
   commands:
-    blocklist:
+    snag-filter:
       run: snag check diff
     go-fmt:
       glob: "*.go"
@@ -15,10 +15,10 @@ pre-commit:
 
 commit-msg:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check msg {1}
 
 pre-push:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check push

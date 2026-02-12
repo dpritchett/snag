@@ -56,7 +56,7 @@ remotes:
   - git_url: %s
     ref: %s
     configs:
-      - recipes/lefthook-blocklist.yml
+      - recipes/lefthook-snag-filter.yml
 `, snagRemoteURL, ref)
 }
 

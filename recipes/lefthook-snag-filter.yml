@@ -1,15 +1,15 @@
 pre-commit:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check diff
       fail_text: >
         Staged diff contains a blocked pattern.
-        See .blocklist (or parent directories) for the active pattern list.
+        See snag.toml (or parent directories) for the active pattern list.
         https://github.com/dpritchett/snag
 
 commit-msg:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check msg {1}
       fail_text: >
         Commit message contains a blocked pattern.
@@ -19,7 +19,7 @@ commit-msg:
 
 pre-push:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check push
       fail_text: >
         Unpushed commits contain a blocked pattern (message or diff).
@@ -30,13 +30,13 @@ post-checkout:
     snag-setup-check:
       run: snag check checkout
       fail_text: >
-        This repo has a .blocklist but snag hooks aren't installed.
+        This repo has a snag.toml but snag hooks aren't installed.
         Run: snag install && lefthook install
         https://github.com/dpritchett/snag
 
 prepare-commit-msg:
   commands:
-    blocklist:
+    snag-filter:
       run: snag check prepare {1} {2} {3}
       fail_text: >
         Auto-generated commit message contains a blocked pattern.
