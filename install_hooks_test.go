@@ -196,10 +196,14 @@ func TestInstallHooks_DetectsExistingInLocal(t *testing.T) {
 		t.Errorf("expected current version %s in local config", Version)
 	}
 
-	// Shared config should NOT have snag remote added.
+	// Shared config should NOT have snag remote, but SHOULD have hook stubs.
 	sharedData, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
-	if strings.Contains(string(sharedData), "github.com/dpritchett/snag") {
-		t.Error("shared config should not have been modified when snag was only in local")
+	sharedContent := string(sharedData)
+	if strings.Contains(sharedContent, "github.com/dpritchett/snag") {
+		t.Error("shared config should not have snag remote when snag was only in local")
+	}
+	if !strings.Contains(sharedContent, "commit-msg:") {
+		t.Error("shared config should have hook stubs even when remote is in local")
 	}
 }
 
@@ -271,7 +275,7 @@ func TestInstallHooks_LocalFlag(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Local config should have snag remote.
+	// Local config should have snag remote but NO stubs.
 	data, _ := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
 	content := string(data)
 	if !strings.Contains(content, "github.com/dpritchett/snag") {
@@ -282,10 +286,14 @@ func TestInstallHooks_LocalFlag(t *testing.T) {
 		t.Error("original local content was lost")
 	}
 
-	// Shared config should NOT be modified.
+	// Shared config should NOT have snag remote but SHOULD have hook stubs.
 	sharedData, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
-	if strings.Contains(string(sharedData), "github.com/dpritchett/snag") {
-		t.Error("shared config should not have been modified with --local flag")
+	sharedContent := string(sharedData)
+	if strings.Contains(sharedContent, "github.com/dpritchett/snag") {
+		t.Error("shared config should not have snag remote with --local flag")
+	}
+	if !strings.Contains(sharedContent, "commit-msg:") {
+		t.Error("shared config should have hook stubs even with --local flag")
 	}
 }
 
@@ -327,7 +335,7 @@ func TestInstallHooks_LocalFlagCreatesFile(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// lefthook-local.yml should have been created.
+	// lefthook-local.yml should have been created with remote only (no stubs).
 	data, err := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
 	if err != nil {
 		t.Fatalf("expected lefthook-local.yml to be created: %v", err)
@@ -336,9 +344,18 @@ func TestInstallHooks_LocalFlagCreatesFile(t *testing.T) {
 	if !strings.Contains(content, "github.com/dpritchett/snag") {
 		t.Error("expected snag remote in newly created local config")
 	}
-	// Should not have a leading newline (it's a fresh file).
 	if strings.HasPrefix(content, "\n") {
 		t.Error("newly created local config should not start with a blank line")
+	}
+	// Stubs should NOT be in local config (they clobber remote commands in lefthook v2).
+	if strings.Contains(content, "# Hook stubs") {
+		t.Error("local config should not contain hook stubs")
+	}
+
+	// Stubs should be in shared config.
+	sharedData, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	if !strings.Contains(string(sharedData), "commit-msg:") {
+		t.Error("shared config should have hook stubs")
 	}
 }
 
@@ -546,7 +563,7 @@ remotes:
 	}
 }
 
-func TestInstallHooks_LocalCreatesFileWithStubs(t *testing.T) {
+func TestInstallHooks_StubsGoToSharedNotLocal(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)
 
@@ -561,13 +578,23 @@ func TestInstallHooks_LocalCreatesFileWithStubs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, _ := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
-	content := string(data)
-	// New local file should have all hook stubs (including pre-commit since
-	// the local file itself doesn't define it).
-	for _, ht := range snagRecipeHookTypes {
-		if !strings.Contains(content, ht+":") {
-			t.Errorf("expected hook stub %s in newly created local config", ht)
+	// Local config should have remote only, no stubs.
+	localData, _ := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
+	if strings.Contains(string(localData), "# Hook stubs") {
+		t.Error("local config should not contain hook stubs (they clobber remote commands in lefthook v2)")
+	}
+
+	// Shared config should have stubs for all recipe hook types except pre-commit.
+	sharedData, _ := os.ReadFile(filepath.Join(dir, "lefthook.yml"))
+	sharedContent := string(sharedData)
+	for _, ht := range []string{"commit-msg:", "post-checkout:", "pre-push:", "pre-rebase:", "prepare-commit-msg:"} {
+		if !strings.Contains(sharedContent, ht) {
+			t.Errorf("expected hook stub %s in shared config", ht)
 		}
+	}
+	// pre-commit already defined, should not appear in stubs section.
+	stubSection := sharedContent[strings.Index(sharedContent, "# Hook stubs"):]
+	if strings.Contains(stubSection, "pre-commit:") {
+		t.Error("should not add stub for pre-commit when already defined in shared config")
 	}
 }

@@ -67,6 +67,8 @@ Tests are table-driven and create real temporary git repos using helpers defined
 
 snag's own repo uses `lefthook.yml` to dogfood via `go run .`.
 
+See [`docs/lefthook-merge-order.md`](docs/lefthook-merge-order.md) for critical details on how lefthook v2 merges configs and why hook stubs must live in the main config.
+
 ## Key Design Decisions
 
 - **Policy engine must stay hook-runner-agnostic.** The check commands (`diff.go`, `msg.go`, `push.go`, `prepare.go`, `rebase.go`), config (`config.go`, `snag.toml`), and pattern matching (`patterns.go`) must never reference lefthook, husky, pre-commit, or any other hook runner. Runner-specific code is confined to `install_hooks.go` (installation), `checkout.go` (detection), and `shell.go` (nudge hooks). If a new file needs runner awareness, that's a design smell. See #41.

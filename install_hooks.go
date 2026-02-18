@@ -103,6 +103,40 @@ func missingHookStubs(content string) string {
 	return b.String()
 }
 
+// ensureHookStubs adds empty hook-type stubs to the main lefthook config.
+//
+// Stubs MUST live in the main config (not lefthook-local) because lefthook v2
+// merges configs as: main → remotes → local. Empty stubs in the local config
+// clobber the remote recipe's commands. In the main config, the remote recipe
+// overrides the stubs during merge.
+func ensureHookStubs(mainFile string, dryRun bool) (string, error) {
+	data, err := os.ReadFile(mainFile)
+	if err != nil {
+		return "", fmt.Errorf("reading %s: %w", mainFile, err)
+	}
+
+	content := string(data)
+	stubs := missingHookStubs(content)
+	if stubs == "" {
+		return "", nil
+	}
+
+	newContent := content
+	if !strings.HasSuffix(newContent, "\n") {
+		newContent += "\n"
+	}
+	newContent += stubs
+
+	if dryRun {
+		return unifiedDiff(mainFile, content, newContent), nil
+	}
+	if err := os.WriteFile(mainFile, []byte(newContent), 0644); err != nil {
+		return "", fmt.Errorf("writing %s: %w", mainFile, err)
+	}
+	fmt.Fprintf(os.Stderr, "Added hook stubs to %s\n", mainFile)
+	return "", nil
+}
+
 // findSnagRemote parses the YAML and returns the existing snag remote's ref, or "" if not found.
 func findSnagRemote(data []byte) (string, error) {
 	var raw map[string]interface{}
@@ -135,8 +169,8 @@ func installOrUpdateSnagRemote(filename string, createIfMissing bool, dryRun boo
 		if !os.IsNotExist(err) || !createIfMissing {
 			return "", fmt.Errorf("reading %s: %w", filename, err)
 		}
-		// File doesn't exist — create with snag remote block + hook stubs.
-		newContent := snagRemoteBlockTrimmed(ref) + missingHookStubs("")
+		// File doesn't exist — create with just the snag remote block.
+		newContent := snagRemoteBlockTrimmed(ref)
 		if dryRun {
 			return unifiedDiff(filename, "", newContent), nil
 		}
@@ -155,8 +189,8 @@ func installOrUpdateSnagRemote(filename string, createIfMissing bool, dryRun boo
 	content := string(data)
 
 	if existingRef == "" {
-		// No snag remote — append block + hook stubs to end of file.
-		block := snagRemoteBlock(ref) + missingHookStubs(content)
+		// No snag remote — append block to end of file.
+		block := snagRemoteBlock(ref)
 		newContent := content
 		if !strings.HasSuffix(newContent, "\n") {
 			newContent += "\n"
@@ -172,42 +206,25 @@ func installOrUpdateSnagRemote(filename string, createIfMissing bool, dryRun boo
 		return "", nil
 	}
 
-	// Remote exists — update ref if needed, then ensure hook stubs.
-	updated := content
-	if existingRef != ref {
-		oldRef := "ref: " + existingRef
-		newRef := "ref: " + ref
-		updated = strings.Replace(content, oldRef, newRef, 1)
-		if updated == content {
-			return "", fmt.Errorf("found snag remote at %s but could not locate ref line in %s", existingRef, filename)
-		}
-	}
-
-	stubs := missingHookStubs(content)
-	if stubs != "" {
-		if !strings.HasSuffix(updated, "\n") {
-			updated += "\n"
-		}
-		updated += stubs
-	}
-
-	if updated == content {
+	if existingRef == ref {
 		fmt.Fprintf(os.Stderr, "snag remote already configured at %s in %s — no changes needed\n", ref, filename)
 		return "", nil
 	}
 
+	// Snag remote exists at a different version — surgically replace the ref.
+	oldRef := "ref: " + existingRef
+	newRef := "ref: " + ref
+	updated := strings.Replace(content, oldRef, newRef, 1)
+	if updated == content {
+		return "", fmt.Errorf("found snag remote at %s but could not locate ref line in %s", existingRef, filename)
+	}
 	if dryRun {
 		return unifiedDiff(filename, content, updated), nil
 	}
 	if err := os.WriteFile(filename, []byte(updated), 0644); err != nil {
 		return "", fmt.Errorf("writing %s: %w", filename, err)
 	}
-	if existingRef != ref {
-		fmt.Fprintf(os.Stderr, "Updated snag remote from %s to %s in %s\n", existingRef, ref, filename)
-	}
-	if stubs != "" {
-		fmt.Fprintf(os.Stderr, "Added hook stubs to %s\n", filename)
-	}
+	fmt.Fprintf(os.Stderr, "Updated snag remote from %s to %s in %s\n", existingRef, ref, filename)
 	return "", nil
 }
 
@@ -297,6 +314,12 @@ func runInstallHooks(cmd *cobra.Command, args []string) error {
 				dryRunDiffs.WriteString(diff)
 			}
 		}
+		// Stubs always go in the main config (see ensureHookStubs doc).
+		if sharedErr == nil {
+			if err := collectDiff(ensureHookStubs(sharedFile, dryRun)); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
 		if dryRun {
 			showDiffOutput(dryRunDiffs.String())
 			return firstErr
@@ -309,64 +332,54 @@ func runInstallHooks(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fresh install — decide target based on flags or prompt.
+	target, targetIsLocal := "", false
+
 	if useLocal {
-		target := localFile
+		target = localFile
 		if target == "" {
 			target = "lefthook-local.yml"
 		}
-		if err := collectDiff(installOrUpdateSnagRemote(target, true, dryRun)); err != nil {
-			return err
-		}
-		if dryRun {
-			showDiffOutput(dryRunDiffs.String())
-			return nil
-		}
-		fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
-		return nil
-	}
-
-	if useShared {
+		targetIsLocal = true
+	} else if useShared {
 		if sharedErr != nil {
 			return sharedErr
 		}
-		if err := collectDiff(installOrUpdateSnagRemote(sharedFile, false, dryRun)); err != nil {
-			return err
-		}
-		if dryRun {
-			showDiffOutput(dryRunDiffs.String())
-			return nil
-		}
-		fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
-		return nil
-	}
-
-	// No flags — prompt if TTY, otherwise default to shared.
-	if !dryRun && isTTY() {
+		target = sharedFile
+	} else if !dryRun && isTTY() {
 		choice, err := promptForConfigTarget()
 		if err != nil {
 			return err
 		}
 		if choice == "local" {
-			target := localFile
+			target = localFile
 			if target == "" {
 				target = "lefthook-local.yml"
 			}
-			if _, err := installOrUpdateSnagRemote(target, true, false); err != nil {
-				return err
-			}
-			fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
-			return nil
+			targetIsLocal = true
+		} else {
+			target = sharedFile
 		}
-		// choice == "shared", fall through
+	} else {
+		// Default: shared config.
+		if sharedErr != nil {
+			return sharedErr
+		}
+		target = sharedFile
 	}
 
-	// Default: shared config.
-	if sharedErr != nil {
-		return sharedErr
-	}
-	if err := collectDiff(installOrUpdateSnagRemote(sharedFile, false, dryRun)); err != nil {
+	if err := collectDiff(installOrUpdateSnagRemote(target, targetIsLocal, dryRun)); err != nil {
 		return err
 	}
+
+	// Stubs always go in the main config — never in local, because
+	// lefthook v2 merges local OVER remotes and empty stubs clobber
+	// the remote recipe's commands.
+	if sharedErr == nil {
+		if err := collectDiff(ensureHookStubs(sharedFile, dryRun)); err != nil {
+			return err
+		}
+	}
+
 	if dryRun {
 		showDiffOutput(dryRunDiffs.String())
 		return nil
