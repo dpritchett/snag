@@ -136,7 +136,9 @@ remotes:
     configs:
       - recipes/lefthook-snag-filter.yml
 
-# Hook stubs — lefthook needs these to install hooks for remote recipe types.
+# Added by ` + "`" + `snag install` + "`" + ` — do not remove.
+# lefthook only creates .git/hooks/ scripts for hook types it finds here.
+# Without these stubs the snag remote recipe's hooks won't fire.
 commit-msg:
 post-checkout:
 pre-push:
@@ -348,7 +350,7 @@ func TestInstallHooks_LocalFlagCreatesFile(t *testing.T) {
 		t.Error("newly created local config should not start with a blank line")
 	}
 	// Stubs should NOT be in local config (they clobber remote commands in lefthook v2).
-	if strings.Contains(content, "# Hook stubs") {
+	if strings.Contains(content, "Added by `snag install`") {
 		t.Error("local config should not contain hook stubs")
 	}
 
@@ -522,7 +524,7 @@ func TestInstallHooks_AddsStubsOnFreshInstall(t *testing.T) {
 		}
 	}
 	// pre-commit was already there, should not appear in stubs section.
-	stubSection := content[strings.Index(content, "# Hook stubs"):]
+	stubSection := content[strings.Index(content, "Added by `snag install`"):]
 	if strings.Contains(stubSection, "pre-commit:") {
 		t.Error("should not add stub for pre-commit when already defined")
 	}
@@ -580,7 +582,7 @@ func TestInstallHooks_StubsGoToSharedNotLocal(t *testing.T) {
 
 	// Local config should have remote only, no stubs.
 	localData, _ := os.ReadFile(filepath.Join(dir, "lefthook-local.yml"))
-	if strings.Contains(string(localData), "# Hook stubs") {
+	if strings.Contains(string(localData), "Added by `snag install`") {
 		t.Error("local config should not contain hook stubs (they clobber remote commands in lefthook v2)")
 	}
 
@@ -593,7 +595,7 @@ func TestInstallHooks_StubsGoToSharedNotLocal(t *testing.T) {
 		}
 	}
 	// pre-commit already defined, should not appear in stubs section.
-	stubSection := sharedContent[strings.Index(sharedContent, "# Hook stubs"):]
+	stubSection := sharedContent[strings.Index(sharedContent, "Added by `snag install`"):]
 	if strings.Contains(stubSection, "pre-commit:") {
 		t.Error("should not add stub for pre-commit when already defined in shared config")
 	}

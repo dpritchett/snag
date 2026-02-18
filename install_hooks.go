@@ -96,7 +96,9 @@ func missingHookStubs(content string) string {
 	}
 
 	var b strings.Builder
-	b.WriteString("\n# Hook stubs — lefthook needs these to install hooks for remote recipe types.\n")
+	b.WriteString("\n# Added by `snag install` — do not remove.\n")
+	b.WriteString("# lefthook only creates .git/hooks/ scripts for hook types it finds here.\n")
+	b.WriteString("# Without these stubs the snag remote recipe's hooks won't fire.\n")
 	for _, ht := range missing {
 		fmt.Fprintf(&b, "%s:\n", ht)
 	}
