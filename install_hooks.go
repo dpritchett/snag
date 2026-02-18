@@ -13,6 +13,19 @@ import (
 
 const snagRemoteURL = "https://github.com/dpritchett/snag.git"
 
+// snagRecipeHookTypes lists hook types defined in the snag recipe.
+// lefthook only installs .git/hooks/ scripts for types it sees in local
+// config files, so we must add stubs for types that come solely from the
+// remote recipe.
+var snagRecipeHookTypes = []string{
+	"commit-msg",
+	"post-checkout",
+	"pre-commit",
+	"pre-push",
+	"pre-rebase",
+	"prepare-commit-msg",
+}
+
 // lefthookCandidates lists filenames lefthook accepts, in priority order.
 var lefthookCandidates = []string{
 	"lefthook.yml",
@@ -65,6 +78,31 @@ func snagRemoteBlockTrimmed(ref string) string {
 	return strings.TrimLeft(snagRemoteBlock(ref), "\n")
 }
 
+// missingHookStubs returns a YAML block of empty hook-type stubs for
+// snag recipe hook types not already present as top-level keys in content.
+// Returns "" when nothing is missing.
+func missingHookStubs(content string) string {
+	var raw map[string]interface{}
+	_ = yaml.Unmarshal([]byte(content), &raw)
+
+	var missing []string
+	for _, ht := range snagRecipeHookTypes {
+		if _, ok := raw[ht]; !ok {
+			missing = append(missing, ht)
+		}
+	}
+	if len(missing) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n# Hook stubs — lefthook needs these to install hooks for remote recipe types.\n")
+	for _, ht := range missing {
+		fmt.Fprintf(&b, "%s:\n", ht)
+	}
+	return b.String()
+}
+
 // findSnagRemote parses the YAML and returns the existing snag remote's ref, or "" if not found.
 func findSnagRemote(data []byte) (string, error) {
 	var raw map[string]interface{}
@@ -97,8 +135,8 @@ func installOrUpdateSnagRemote(filename string, createIfMissing bool, dryRun boo
 		if !os.IsNotExist(err) || !createIfMissing {
 			return "", fmt.Errorf("reading %s: %w", filename, err)
 		}
-		// File doesn't exist — create with just the snag remote block.
-		newContent := snagRemoteBlockTrimmed(ref)
+		// File doesn't exist — create with snag remote block + hook stubs.
+		newContent := snagRemoteBlockTrimmed(ref) + missingHookStubs("")
 		if dryRun {
 			return unifiedDiff(filename, "", newContent), nil
 		}
@@ -117,8 +155,8 @@ func installOrUpdateSnagRemote(filename string, createIfMissing bool, dryRun boo
 	content := string(data)
 
 	if existingRef == "" {
-		// No snag remote — append block to end of file.
-		block := snagRemoteBlock(ref)
+		// No snag remote — append block + hook stubs to end of file.
+		block := snagRemoteBlock(ref) + missingHookStubs(content)
 		newContent := content
 		if !strings.HasSuffix(newContent, "\n") {
 			newContent += "\n"
@@ -134,25 +172,42 @@ func installOrUpdateSnagRemote(filename string, createIfMissing bool, dryRun boo
 		return "", nil
 	}
 
-	if existingRef == ref {
+	// Remote exists — update ref if needed, then ensure hook stubs.
+	updated := content
+	if existingRef != ref {
+		oldRef := "ref: " + existingRef
+		newRef := "ref: " + ref
+		updated = strings.Replace(content, oldRef, newRef, 1)
+		if updated == content {
+			return "", fmt.Errorf("found snag remote at %s but could not locate ref line in %s", existingRef, filename)
+		}
+	}
+
+	stubs := missingHookStubs(content)
+	if stubs != "" {
+		if !strings.HasSuffix(updated, "\n") {
+			updated += "\n"
+		}
+		updated += stubs
+	}
+
+	if updated == content {
 		fmt.Fprintf(os.Stderr, "snag remote already configured at %s in %s — no changes needed\n", ref, filename)
 		return "", nil
 	}
 
-	// Snag remote exists at a different version — surgically replace the ref.
-	oldRef := "ref: " + existingRef
-	newRef := "ref: " + ref
-	updated := strings.Replace(content, oldRef, newRef, 1)
-	if updated == content {
-		return "", fmt.Errorf("found snag remote at %s but could not locate ref line in %s", existingRef, filename)
-	}
 	if dryRun {
 		return unifiedDiff(filename, content, updated), nil
 	}
 	if err := os.WriteFile(filename, []byte(updated), 0644); err != nil {
 		return "", fmt.Errorf("writing %s: %w", filename, err)
 	}
-	fmt.Fprintf(os.Stderr, "Updated snag remote from %s to %s in %s\n", existingRef, ref, filename)
+	if existingRef != ref {
+		fmt.Fprintf(os.Stderr, "Updated snag remote from %s to %s in %s\n", existingRef, ref, filename)
+	}
+	if stubs != "" {
+		fmt.Fprintf(os.Stderr, "Added hook stubs to %s\n", filename)
+	}
 	return "", nil
 }
 
