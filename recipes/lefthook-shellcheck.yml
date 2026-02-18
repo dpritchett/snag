@@ -1,6 +1,6 @@
 pre-commit:
-  commands:
-    shellcheck:
+  jobs:
+    - name: shellcheck
       glob: "*.sh"
       run: shellcheck {staged_files}
       fail_text: >

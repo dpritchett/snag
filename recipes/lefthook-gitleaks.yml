@@ -1,6 +1,6 @@
 pre-commit:
-  commands:
-    gitleaks:
+  jobs:
+    - name: gitleaks
       run: gitleaks detect --staged
       fail_text: >
         gitleaks found potential secrets in staged changes.

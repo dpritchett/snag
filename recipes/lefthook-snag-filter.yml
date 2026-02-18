@@ -1,6 +1,6 @@
 pre-commit:
-  commands:
-    snag-filter:
+  jobs:
+    - name: snag-filter
       run: snag check diff
       fail_text: >
         Staged diff contains a blocked pattern.
@@ -8,8 +8,8 @@ pre-commit:
         https://github.com/dpritchett/snag
 
 commit-msg:
-  commands:
-    snag-filter:
+  jobs:
+    - name: snag-filter
       run: snag check msg {1}
       fail_text: >
         Commit message contains a blocked pattern.
@@ -18,16 +18,16 @@ commit-msg:
         https://github.com/dpritchett/snag
 
 pre-push:
-  commands:
-    snag-filter:
+  jobs:
+    - name: snag-filter
       run: snag check push
       fail_text: >
         Unpushed commits contain a blocked pattern (message or diff).
         https://github.com/dpritchett/snag
 
 post-checkout:
-  commands:
-    snag-setup-check:
+  jobs:
+    - name: snag-setup-check
       run: snag check checkout
       fail_text: >
         This repo has a snag.toml but snag hooks aren't installed.
@@ -35,8 +35,8 @@ post-checkout:
         https://github.com/dpritchett/snag
 
 prepare-commit-msg:
-  commands:
-    snag-filter:
+  jobs:
+    - name: snag-filter
       run: snag check prepare {1} {2} {3}
       fail_text: >
         Auto-generated commit message contains a blocked pattern.
@@ -44,8 +44,8 @@ prepare-commit-msg:
         https://github.com/dpritchett/snag
 
 pre-rebase:
-  commands:
-    snag-branch-guard:
+  jobs:
+    - name: snag-branch-guard
       run: snag check rebase {1} {2}
       fail_text: >
         Rebase blocked — target is a protected branch.

@@ -1,24 +1,24 @@
 pre-commit:
   parallel: true
-  commands:
-    snag-filter:
+  jobs:
+    - name: snag-filter
       run: snag check diff
-    go-fmt:
+    - name: go-fmt
       glob: "*.go"
       run: gofmt -l . | grep . && exit 1 || true
-    go-vet:
+    - name: go-vet
       glob: "*.go"
       run: go vet ./...
-    go-test:
+    - name: go-test
       glob: "*.go"
       run: go test ./...
 
 commit-msg:
-  commands:
-    snag-filter:
+  jobs:
+    - name: snag-filter
       run: snag check msg {1}
 
 pre-push:
-  commands:
-    snag-filter:
+  jobs:
+    - name: snag-filter
       run: snag check push
