@@ -5,11 +5,23 @@ import (
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"golang.org/x/term"
 )
 
-var renderer = lipgloss.NewRenderer(os.Stderr)
-var stdoutRenderer = lipgloss.NewRenderer(os.Stdout)
+// newSafeRenderer creates a lipgloss renderer that skips terminal
+// auto-detection (OSC queries) when the writer is not a TTY.
+// Without this, termenv blocks ~5 s per invocation inside git hooks
+// waiting for a terminal response that never comes.
+func newSafeRenderer(w *os.File) *lipgloss.Renderer {
+	if !term.IsTerminal(int(w.Fd())) {
+		return lipgloss.NewRenderer(w, termenv.WithProfile(termenv.Ascii))
+	}
+	return lipgloss.NewRenderer(w)
+}
+
+var renderer = newSafeRenderer(os.Stderr)
+var stdoutRenderer = newSafeRenderer(os.Stdout)
 
 var (
 	errorStyle = renderer.NewStyle().Bold(true).Foreground(lipgloss.Color("9")) // red
