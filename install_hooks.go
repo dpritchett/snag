@@ -335,6 +335,9 @@ func runInstallHooks(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "Note: snag remote found in both %s and %s; updated both.\n", sharedFile, localFile)
 		}
 		fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
+		if firstErr == nil {
+			runPostInstallAudit(cmd)
+		}
 		return firstErr
 	}
 
@@ -392,7 +395,24 @@ func runInstallHooks(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	fmt.Fprintf(os.Stderr, "Run `lefthook install` to activate.\n")
+	runPostInstallAudit(cmd)
 	return nil
+}
+
+// runPostInstallAudit runs an informational audit scan after install.
+// Violations are printed as warnings but don't block the install.
+func runPostInstallAudit(cmd *cobra.Command) {
+	fmt.Fprintln(os.Stderr)
+	infof("running post-install audit...")
+	auditCmd := buildAuditCmd()
+	// Inherit the parent command's flags where applicable.
+	if q, _ := cmd.Flags().GetBool("quiet"); q {
+		auditCmd.Flags().Set("quiet", "true")
+	}
+	if err := auditCmd.RunE(auditCmd, nil); err != nil {
+		// Print the error as a warning — don't fail the install.
+		warnf("audit found issues: %v", err)
+	}
 }
 
 // versionRef returns the Version string with a "v" prefix for use as a git tag ref.

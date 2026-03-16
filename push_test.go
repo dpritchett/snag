@@ -204,3 +204,101 @@ func TestRunPush_DiffMatch(t *testing.T) {
 		t.Errorf("stderr should contain match message, got: %q", stderr)
 	}
 }
+
+// initBareRemote creates a bare clone of dir and adds it as "origin".
+func initBareRemote(t *testing.T, dir string) string {
+	t.Helper()
+	bare := t.TempDir()
+	cmd := exec.Command("git", "clone", "--bare", dir, bare)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone --bare: %v\n%s", err, out)
+	}
+	add := exec.Command("git", "remote", "add", "origin", bare)
+	add.Dir = dir
+	if out, err := add.CombinedOutput(); err != nil {
+		t.Fatalf("git remote add: %v\n%s", err, out)
+	}
+	// Fetch so remote tracking refs exist locally.
+	fetch := exec.Command("git", "fetch", "origin")
+	fetch.Dir = dir
+	if out, err := fetch.CombinedOutput(); err != nil {
+		t.Fatalf("git fetch: %v\n%s", err, out)
+	}
+	return bare
+}
+
+func TestRunPush_SkipsCommitsAlreadyOnRemote(t *testing.T) {
+	dir := initGitRepo(t)
+	initialCommit(t, dir)
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\nmsg = [\"hack\"]\n"), 0644)
+
+	// Create a commit with a violation — this will be "already pushed".
+	commitFile(t, dir, "a.txt", "this is a hack\n", "add file with violation")
+
+	// Set up a bare remote that includes the violation commit.
+	initBareRemote(t, dir)
+
+	// Now make a clean new commit that hasn't been pushed.
+	commitFile(t, dir, "b.txt", "clean content\n", "add clean file")
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	oldStderr := os.Stderr
+	_, w, _ := os.Pipe()
+	os.Stderr = w
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "push"})
+	err := rootCmd.Execute()
+
+	w.Close()
+	os.Stderr = oldStderr
+
+	// The violation commit is already on the remote, so only the new
+	// clean commit should be scanned — no error expected.
+	if err != nil {
+		t.Fatalf("expected no error (violation is on remote), got: %v", err)
+	}
+}
+
+func TestRunPush_CatchesNewViolationWithRemote(t *testing.T) {
+	dir := initGitRepo(t)
+	initialCommit(t, dir)
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\ndiff = [\"hack\"]\nmsg = [\"hack\"]\n"), 0644)
+
+	// Clean commit that gets pushed to remote.
+	commitFile(t, dir, "a.txt", "clean content\n", "add clean file")
+
+	initBareRemote(t, dir)
+
+	// New commit with a violation — not yet on remote.
+	commitFile(t, dir, "b.txt", "this is a hack\n", "add violation")
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	oldStderr := os.Stderr
+	_, w, _ := os.Pipe()
+	os.Stderr = w
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "push"})
+	err := rootCmd.Execute()
+
+	w.Close()
+	os.Stderr = oldStderr
+
+	if err == nil {
+		t.Fatal("expected error for new violation not yet on remote")
+	}
+	if !strings.Contains(err.Error(), "hack") {
+		t.Errorf("error should mention matched pattern, got: %v", err)
+	}
+}

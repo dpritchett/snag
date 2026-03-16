@@ -156,6 +156,10 @@ If a snag remote already exists at an older version, it updates the ref
 in place without touching the rest of the file. If it's already current,
 it does nothing.
 
+After installing, `snag install` runs an informational `snag audit` to
+flag any existing violations in recent history. These are printed as
+warnings and don't block the install.
+
 ### `snag check diff`
 
 ```

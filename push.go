@@ -8,23 +8,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// unpushedRange returns the git revision range covering unpushed commits.
-// If an upstream is configured it returns "@{upstream}..HEAD".
-// Otherwise it falls back to "HEAD" (the single tip commit).
-func unpushedRange() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--verify", "@{upstream}")
-	if err := cmd.Run(); err == nil {
-		return "@{upstream}..HEAD", nil
+// unpushedCommits returns commit SHAs not yet on any remote.
+// With an upstream configured it uses @{upstream}..HEAD.
+// Without one it uses HEAD --not --remotes to exclude commits
+// already reachable from any remote tracking ref.
+func unpushedCommits() ([]string, error) {
+	var args []string
+	if exec.Command("git", "rev-parse", "--verify", "@{upstream}").Run() == nil {
+		args = []string{"rev-list", "@{upstream}..HEAD"}
+	} else {
+		args = []string{"rev-list", "HEAD", "--not", "--remotes"}
 	}
-	// No upstream tracked — check the tip commit only.
-	return "HEAD", nil
-}
-
-// unpushedCommits returns the list of commit SHAs in the given revision range.
-func unpushedCommits(revRange string) ([]string, error) {
-	out, err := exec.Command("git", "rev-list", revRange).CombinedOutput()
+	out, err := exec.Command("git", args...).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("git rev-list %s: %w\n%s", revRange, err, out)
+		return nil, fmt.Errorf("git rev-list: %w\n%s", err, out)
 	}
 	text := strings.TrimSpace(string(out))
 	if text == "" {
@@ -43,12 +40,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	revRange, err := unpushedRange()
-	if err != nil {
-		return err
-	}
-
-	shas, err := unpushedCommits(revRange)
+	shas, err := unpushedCommits()
 	if err != nil {
 		return err
 	}
