@@ -90,12 +90,18 @@ func TestAudit_BothMsgAndDiff(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
+	oldStdout := os.Stdout
+	rOut, wOut, _ := os.Pipe()
+	os.Stdout = wOut
+
 	rootCmd := buildRootCmd()
 	rootCmd.SetArgs([]string{"audit"})
 	err := rootCmd.Execute()
 
 	w.Close()
 	os.Stderr = oldStderr
+	wOut.Close()
+	os.Stdout = oldStdout
 
 	if err == nil {
 		t.Fatal("expected error when both msg and diff violations exist")
@@ -106,6 +112,13 @@ func TestAudit_BothMsgAndDiff(t *testing.T) {
 	stderr := string(buf[:n])
 	if !strings.Contains(stderr, "2 violations") {
 		t.Errorf("should report 2 violations, got: %q", stderr)
+	}
+
+	outBuf := make([]byte, 4096)
+	nOut, _ := rOut.Read(outBuf)
+	stdout := string(outBuf[:nOut])
+	if !strings.Contains(stdout, "fixup! bad commit") {
+		t.Errorf("stdout should contain commit subject, got: %q", stdout)
 	}
 }
 

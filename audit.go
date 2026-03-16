@@ -64,13 +64,7 @@ func runAudit(cmd *cobra.Command, args []string) error {
 		infof("scanning %d commits...", len(shas))
 	}
 
-	var reports []commitReport
-	for _, sha := range shas {
-		report := scanCommit(sha, bc)
-		if len(report.Matches) > 0 {
-			reports = append(reports, report)
-		}
-	}
+	reports := scanCommits(shas, bc)
 
 	if !quiet {
 		for _, r := range reports {
@@ -146,33 +140,102 @@ func auditRevList(args []string, limit int) ([]string, error) {
 	return shas, nil
 }
 
-// scanCommit checks a single commit's message and diff against patterns.
-func scanCommit(sha string, bc *BlockConfig) commitReport {
-	report := commitReport{SHA: sha}
+// scanCommits checks all commits' messages and diffs in bulk using
+// batched git calls instead of per-commit forks.
+func scanCommits(shas []string, bc *BlockConfig) []commitReport {
+	reports := make([]commitReport, len(shas))
+	shaIndex := make(map[string]int, len(shas))
+	for i, sha := range shas {
+		reports[i].SHA = sha
+		shaIndex[sha] = i
+	}
 
-	// Get subject line for display.
-	subOut, _ := exec.Command("git", "log", "-1", "--format=%s", sha).CombinedOutput()
-	report.Subject = strings.TrimSpace(string(subOut))
-
-	// Check commit message against msg patterns.
-	if len(bc.Msg) > 0 {
-		msgOut, err := exec.Command("git", "log", "-1", "--format=%B", sha).CombinedOutput()
-		if err == nil {
-			if pattern, found := matchesPattern(string(msgOut), bc.Msg); found {
-				report.Matches = append(report.Matches, violation{Kind: "msg", Pattern: pattern})
+	// Batch fetch subjects and full messages in one git log call.
+	// Format: <sha>\x00<subject>\x00<body>\x00\x01 per commit
+	// \x01 is the record separator (%B can contain newlines).
+	logArgs := []string{"log", "--format=%H%x00%s%x00%B%x00%x01", "--no-walk"}
+	logArgs = append(logArgs, shas...)
+	if logOut, err := exec.Command("git", logArgs...).CombinedOutput(); err == nil {
+		for _, entry := range strings.Split(string(logOut), "\x01") {
+			entry = strings.TrimSpace(entry)
+			if entry == "" {
+				continue
+			}
+			parts := strings.SplitN(entry, "\x00", 3)
+			if len(parts) < 3 {
+				continue
+			}
+			sha := strings.TrimSpace(parts[0])
+			idx, ok := shaIndex[sha]
+			if !ok {
+				continue
+			}
+			reports[idx].Subject = parts[1]
+			if len(bc.Msg) > 0 {
+				body := strings.TrimSuffix(parts[2], "\x00")
+				if pattern, found := matchesPattern(body, bc.Msg); found {
+					reports[idx].Matches = append(reports[idx].Matches, violation{Kind: "msg", Pattern: pattern})
+				}
 			}
 		}
 	}
 
-	// Check commit diff against diff patterns.
+	// Batch fetch diffs via git diff-tree --stdin.
 	if len(bc.Diff) > 0 {
-		diffOut, err := exec.Command("git", "diff-tree", "-p", sha).CombinedOutput()
-		if err == nil {
-			if pattern, found := matchesPattern(stripDiffNoise(stripDiffMeta(string(diffOut))), bc.Diff); found {
-				report.Matches = append(report.Matches, violation{Kind: "diff", Pattern: pattern})
+		cmd := exec.Command("git", "diff-tree", "-p", "--stdin")
+		cmd.Stdin = strings.NewReader(strings.Join(shas, "\n") + "\n")
+		if diffOut, err := cmd.CombinedOutput(); err == nil {
+			// diff-tree --stdin output starts each commit with the SHA on its own line.
+			// Split on SHA boundaries.
+			chunks := splitDiffByCommit(string(diffOut), shas)
+			for sha, diff := range chunks {
+				idx := shaIndex[sha]
+				if pattern, found := matchesPattern(stripDiffNoise(stripDiffMeta(diff)), bc.Diff); found {
+					reports[idx].Matches = append(reports[idx].Matches, violation{Kind: "diff", Pattern: pattern})
+				}
 			}
 		}
 	}
 
-	return report
+	// Filter to only reports with violations.
+	var result []commitReport
+	for _, r := range reports {
+		if len(r.Matches) > 0 {
+			result = append(result, r)
+		}
+	}
+	return result
+}
+
+// splitDiffByCommit splits combined diff-tree --stdin output into
+// per-commit chunks keyed by full SHA.
+func splitDiffByCommit(output string, shas []string) map[string]string {
+	shaSet := make(map[string]bool, len(shas))
+	for _, sha := range shas {
+		shaSet[sha] = true
+	}
+
+	chunks := make(map[string]string, len(shas))
+	var currentSHA string
+	var buf strings.Builder
+
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) == 40 && shaSet[trimmed] {
+			if currentSHA != "" {
+				chunks[currentSHA] = buf.String()
+			}
+			currentSHA = trimmed
+			buf.Reset()
+			continue
+		}
+		if currentSHA != "" {
+			buf.WriteString(line)
+			buf.WriteByte('\n')
+		}
+	}
+	if currentSHA != "" {
+		chunks[currentSHA] = buf.String()
+	}
+	return chunks
 }
