@@ -9,31 +9,32 @@ import (
 	"golang.org/x/term"
 )
 
-// newSafeRenderer creates a lipgloss renderer that skips terminal
-// auto-detection (OSC queries) when stdin is not a TTY.
-// The OSC 11 probe writes to the output but reads the response from stdin,
-// so stdin is what determines whether auto-detection can succeed.
-// Inside lefthook's pty the output writer IS a terminal (pty slave),
-// but stdin is a pipe — checking stdin catches that case.
+// newSafeRenderer creates a lipgloss renderer that never triggers
+// termenv's OSC 11 background-color probe. That probe hangs ~5 s
+// inside lefthook's pty (all fds are TTYs but no terminal emulator
+// responds). We still check the writer fd for TTY-ness so pipes
+// get plain text and real terminals get ANSI colors.
 func newSafeRenderer(w *os.File) *lipgloss.Renderer {
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return lipgloss.NewRenderer(w, termenv.WithProfile(termenv.Ascii))
+	profile := termenv.Ascii
+	if term.IsTerminal(int(w.Fd())) {
+		profile = termenv.ANSI
 	}
-	return lipgloss.NewRenderer(w)
+	r := lipgloss.NewRenderer(w, termenv.WithProfile(profile))
+	r.SetColorProfile(profile)
+	r.SetHasDarkBackground(true)
+	return r
 }
 
 var renderer = newSafeRenderer(os.Stderr)
 var stdoutRenderer = newSafeRenderer(os.Stdout)
 
 func init() {
-	// Pin the default renderer when stdin isn't a TTY.
-	// huh (used by `snag install`) calls AdaptiveColor / HasDarkBackground
-	// on lipgloss.DefaultRenderer(), which triggers the same OSC probe.
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		r := lipgloss.DefaultRenderer()
-		r.SetColorProfile(termenv.ANSI)
-		r.SetHasDarkBackground(true)
-	}
+	// Pin the default lipgloss renderer so any code that calls
+	// lipgloss.HasDarkBackground() or uses AdaptiveColor won't
+	// trigger termenv's OSC 11 probe.
+	r := lipgloss.DefaultRenderer()
+	r.SetColorProfile(termenv.ANSI)
+	r.SetHasDarkBackground(true)
 }
 
 var (

@@ -5,7 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/huh"
+	"bufio"
+
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
@@ -238,19 +239,23 @@ var isTTY = func() bool {
 // promptForConfigTarget asks the user interactively whether to install to shared or local config.
 // Returns "shared" or "local".
 var promptForConfigTarget = func() (string, error) {
-	var choice string
-	err := huh.NewSelect[string]().
-		Title("Where should snag hooks be installed?").
-		Options(
-			huh.NewOption("Shared config (lefthook.yml) — checked in, whole team gets it", "shared"),
-			huh.NewOption("Local config (lefthook-local.yml) — gitignored, just for you", "local"),
-		).
-		Value(&choice).
-		Run()
-	if err != nil {
-		return "", fmt.Errorf("prompt cancelled: %w", err)
+	fmt.Fprintln(os.Stderr, "Where should snag hooks be installed?")
+	fmt.Fprintln(os.Stderr, "  1) Shared config (lefthook.yml) — checked in, whole team gets it")
+	fmt.Fprintln(os.Stderr, "  2) Local config (lefthook-local.yml) — gitignored, just for you")
+	fmt.Fprint(os.Stderr, "Choice [1/2]: ")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		return "", fmt.Errorf("prompt cancelled")
 	}
-	return choice, nil
+	switch strings.TrimSpace(scanner.Text()) {
+	case "1", "shared":
+		return "shared", nil
+	case "2", "local":
+		return "local", nil
+	default:
+		return "", fmt.Errorf("invalid choice %q — expected 1 or 2", scanner.Text())
+	}
 }
 
 func runInstallHooks(cmd *cobra.Command, args []string) error {

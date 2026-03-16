@@ -114,29 +114,30 @@ func TestOutputNoANSI_WhenPiped(t *testing.T) {
 	}
 }
 
-func TestNewSafeRenderer_AsciiWhenStdinIsNotTTY(t *testing.T) {
-	// Regression: newSafeRenderer must check stdin, not the output writer.
-	// Inside lefthook's pty the writer is a TTY but stdin is a pipe,
-	// so OSC queries can't read responses and hang for 5 seconds.
-	// Open a pty master to get a real TTY fd as the writer.
-	ptmx, err := os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
+func TestNewSafeRenderer_NoOSCProbe(t *testing.T) {
+	// Regression: termenv's OSC 11 probe hangs ~5 s inside lefthook's pty.
+	// newSafeRenderer must pin the color profile to avoid triggering it.
+	// We verify a pipe writer gets Ascii profile (no colors) and that
+	// ColorProfile() returns instantly (no 5 s OSC timeout).
+	_, w, err := os.Pipe()
 	if err != nil {
-		t.Skip("cannot open /dev/ptmx:", err)
+		t.Fatal(err)
 	}
-	defer ptmx.Close()
+	defer w.Close()
 
-	// In tests stdin is a pipe (not a TTY), so newSafeRenderer should
-	// return ASCII profile even though the writer fd is a terminal.
-	r := newSafeRenderer(ptmx)
+	r := newSafeRenderer(w)
 	if r.ColorProfile() != termenv.Ascii {
-		t.Errorf("expected Ascii profile when stdin is not a TTY, got %v", r.ColorProfile())
+		t.Errorf("expected Ascii profile for pipe writer, got %v", r.ColorProfile())
+	}
+	if r.HasDarkBackground() != true {
+		t.Error("expected dark background to be pinned")
 	}
 }
 
-func TestDefaultRenderer_PinnedWhenStdinIsNotTTY(t *testing.T) {
+func TestDefaultRenderer_Pinned(t *testing.T) {
 	// Regression: huh's AdaptiveColor calls HasDarkBackground on
 	// lipgloss.DefaultRenderer(), which triggers the same OSC probe.
-	// The init() func should have pinned the default renderer.
+	// init() must pin the default renderer unconditionally.
 	r := lipgloss.DefaultRenderer()
 	if r.HasDarkBackground() != true {
 		t.Error("expected DefaultRenderer to have dark background pinned")
