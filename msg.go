@@ -36,7 +36,7 @@ func runMsg(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(bc.Msg) == 0 {
+	if len(bc.Msg) == 0 && bc.MsgMaxLen == 0 && bc.MsgMaxLines == 0 {
 		return nil
 	}
 
@@ -61,6 +61,28 @@ func runMsg(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Pass 1.5 — structural limits: check line length and line count.
+	content := msgContentLines(cleaned)
+	if bc.MsgMaxLen > 0 && len(content) > 0 {
+		first := content[0]
+		if len(first) > bc.MsgMaxLen {
+			if !quiet {
+				errorf("first line is %d chars (limit: %d)", len(first), bc.MsgMaxLen)
+				bell()
+				hintf("to recover: git commit -eF .git/COMMIT_EDITMSG")
+			}
+			return fmt.Errorf("policy violation: first line exceeds %d characters (%d)", bc.MsgMaxLen, len(first))
+		}
+	}
+	if bc.MsgMaxLines > 0 && len(content) > bc.MsgMaxLines {
+		if !quiet {
+			errorf("commit message has %d lines (limit: %d)", len(content), bc.MsgMaxLines)
+			bell()
+			hintf("to recover: git commit -eF .git/COMMIT_EDITMSG")
+		}
+		return fmt.Errorf("policy violation: commit message exceeds %d lines (%d)", bc.MsgMaxLines, len(content))
+	}
+
 	// Pass 2 — hard reject: check the remaining message body. Unlike pass 1,
 	// a match here blocks the commit entirely.
 	body := strings.Join(cleaned, "\n")
@@ -75,4 +97,18 @@ func runMsg(cmd *cobra.Command, args []string) error {
 		hintf("to recover: git commit -eF .git/COMMIT_EDITMSG")
 	}
 	return fmt.Errorf("policy violation: %q found in commit message", pattern)
+}
+
+// msgContentLines returns non-blank, non-comment lines from a commit message.
+// Comment lines (# prefix) and blank lines are excluded from structural checks.
+func msgContentLines(lines []string) []string {
+	var out []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }

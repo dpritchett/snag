@@ -19,19 +19,23 @@ type snagTOML struct {
 
 // blockSection maps each hook phase to its own pattern list.
 type blockSection struct {
-	Diff   []string  `toml:"diff"`
-	Msg    []string  `toml:"msg"`
-	Push   *[]string `toml:"push"`
-	Branch []string  `toml:"branch"`
+	Diff        []string  `toml:"diff"`
+	Msg         []string  `toml:"msg"`
+	Push        *[]string `toml:"push"`
+	Branch      []string  `toml:"branch"`
+	MsgMaxLen   int       `toml:"msg_max_len"`
+	MsgMaxLines int       `toml:"msg_max_lines"`
 }
 
 // BlockConfig holds the resolved per-hook pattern lists.
 // Push is nil when not explicitly set (fallback to Diff+Msg union).
 type BlockConfig struct {
-	Diff   []string
-	Msg    []string
-	Push   []string // nil = "not explicitly set" (falls back to Diff+Msg)
-	Branch []string
+	Diff        []string
+	Msg         []string
+	Push        []string // nil = "not explicitly set" (falls back to Diff+Msg)
+	Branch      []string
+	MsgMaxLen   int // max characters on first content line (0 = unlimited)
+	MsgMaxLines int // max non-blank, non-comment lines (0 = unlimited)
 }
 
 // PushPatterns returns Push if explicitly set, otherwise the union of Diff and Msg.
@@ -44,7 +48,8 @@ func (bc *BlockConfig) PushPatterns() []string {
 
 // HasAnyPatterns reports whether any field has at least one pattern.
 func (bc *BlockConfig) HasAnyPatterns() bool {
-	return len(bc.Diff) > 0 || len(bc.Msg) > 0 || len(bc.Push) > 0 || len(bc.Branch) > 0
+	return len(bc.Diff) > 0 || len(bc.Msg) > 0 || len(bc.Push) > 0 || len(bc.Branch) > 0 ||
+		bc.MsgMaxLen > 0 || bc.MsgMaxLines > 0
 }
 
 // loadSnagTOML parses a single snag.toml file. A missing file returns zero value with no error.
@@ -166,6 +171,12 @@ func mergeTOML(bc *BlockConfig, path string) error {
 		bc.Push = merged
 	}
 	bc.Branch = append(bc.Branch, cfg.Block.Branch...)
+	if cfg.Block.MsgMaxLen > bc.MsgMaxLen {
+		bc.MsgMaxLen = cfg.Block.MsgMaxLen
+	}
+	if cfg.Block.MsgMaxLines > bc.MsgMaxLines {
+		bc.MsgMaxLines = cfg.Block.MsgMaxLines
+	}
 	return nil
 }
 

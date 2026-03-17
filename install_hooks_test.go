@@ -361,6 +361,34 @@ func TestInstallHooks_LocalFlagCreatesFile(t *testing.T) {
 	}
 }
 
+func TestInstallHooks_PromptSharedNoConfig(t *testing.T) {
+	dir := t.TempDir()
+	// No lefthook.yml exists.
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	// Simulate TTY + user choosing "shared".
+	origIsTTY := isTTY
+	isTTY = func() bool { return true }
+	defer func() { isTTY = origIsTTY }()
+
+	origPrompt := promptForConfigTarget
+	promptForConfigTarget = func() (string, error) { return "shared", nil }
+	defer func() { promptForConfigTarget = origPrompt }()
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"install"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when no lefthook config exists")
+	}
+	if !strings.Contains(err.Error(), "no lefthook config found") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestInstallHooks_NonTTYDefaultsToShared(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "lefthook.yml"), []byte("pre-commit:\n  commands:\n    lint:\n      run: echo lint\n"), 0644)

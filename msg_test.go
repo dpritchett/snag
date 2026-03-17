@@ -173,6 +173,184 @@ func TestRunMsg_TrailerStrippedThenBodyMatch(t *testing.T) {
 	}
 }
 
+func TestMsgContentLines(t *testing.T) {
+	tests := []struct {
+		name  string
+		lines []string
+		want  int
+	}{
+		{"empty", nil, 0},
+		{"blank lines only", []string{"", "  ", "\t"}, 0},
+		{"comments only", []string{"# comment", "# another"}, 0},
+		{"mixed", []string{"subject", "", "# comment", "body line"}, 2},
+		{"all content", []string{"one", "two", "three"}, 3},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := msgContentLines(tc.lines)
+			if len(got) != tc.want {
+				t.Errorf("msgContentLines() returned %d lines, want %d", len(got), tc.want)
+			}
+		})
+	}
+}
+
+func TestRunMsg_MaxLenExceeded(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg_max_len = 20\n"), 0644)
+
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	os.WriteFile(msgFile, []byte("this first line is way too long for the limit\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for first line exceeding max_len")
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("error should mention 'exceeds', got: %v", err)
+	}
+}
+
+func TestRunMsg_MaxLenOK(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg_max_len = 100\n"), 0644)
+
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	os.WriteFile(msgFile, []byte("short subject\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestRunMsg_MaxLenSkipsComments(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg_max_len = 20\n"), 0644)
+
+	// First real line is "ok" (2 chars), the long line is a comment.
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	os.WriteFile(msgFile, []byte("# this comment is very long and should be ignored by the check\nok\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("expected no error (comment skipped), got: %v", err)
+	}
+}
+
+func TestRunMsg_MaxLinesExceeded(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg_max_lines = 3\n"), 0644)
+
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	os.WriteFile(msgFile, []byte("line one\nline two\nline three\nline four\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for exceeding max_lines")
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("error should mention 'exceeds', got: %v", err)
+	}
+}
+
+func TestRunMsg_MaxLinesOK(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg_max_lines = 3\n"), 0644)
+
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	os.WriteFile(msgFile, []byte("subject\n\nbody line\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestRunMsg_MaxLinesSkipsBlanksAndComments(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg_max_lines = 2\n"), 0644)
+
+	// 2 content lines + blanks + comments = should pass
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	os.WriteFile(msgFile, []byte("subject\n\n# comment\n\nbody\n# another comment\n\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("expected no error (blanks/comments don't count), got: %v", err)
+	}
+}
+
+func TestRunMsg_ZeroMeansUnlimited(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"),
+		[]byte("[block]\nmsg_max_len = 0\nmsg_max_lines = 0\n"), 0644)
+
+	msgFile := filepath.Join(dir, "COMMIT_EDITMSG")
+	long := strings.Repeat("x", 500) + "\n" + strings.Repeat("line\n", 50)
+	os.WriteFile(msgFile, []byte(long), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"check", "msg", msgFile})
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("expected no error with zero limits, got: %v", err)
+	}
+}
+
 func TestRunMsg_BodyMatch(t *testing.T) {
 	dir := t.TempDir()
 

@@ -367,6 +367,9 @@ func runInstallHooks(cmd *cobra.Command, args []string) error {
 			}
 			targetIsLocal = true
 		} else {
+			if sharedErr != nil {
+				return sharedErr
+			}
 			target = sharedFile
 		}
 	} else {

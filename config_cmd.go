@@ -25,12 +25,14 @@ a ~ prefix.`,
 
 // configSource pairs a source label with the patterns it contributes.
 type configSource struct {
-	Label  string
-	Kind   string // "toml", "env", "default"
-	Diff   []string
-	Msg    []string
-	Push   *[]string // nil = not set
-	Branch []string
+	Label       string
+	Kind        string // "toml", "env", "default"
+	Diff        []string
+	Msg         []string
+	Push        *[]string // nil = not set
+	Branch      []string
+	MsgMaxLen   int
+	MsgMaxLines int
 }
 
 func runConfig(cmd *cobra.Command, args []string) error {
@@ -58,6 +60,12 @@ func runConfig(cmd *cobra.Command, args []string) error {
 				printSection("push", *src.Push)
 			}
 			printSection("branch", src.Branch)
+			if src.MsgMaxLen > 0 {
+				fmt.Printf("  %-8s %d\n", "msg_max_len:", src.MsgMaxLen)
+			}
+			if src.MsgMaxLines > 0 {
+				fmt.Printf("  %-8s %d\n", "msg_max_lines:", src.MsgMaxLines)
+			}
 		case "env":
 			printSection("branch", src.Branch)
 		case "default":
@@ -196,15 +204,18 @@ func tomlSource(path string) (*configSource, error) {
 	}
 	abs, _ := filepath.Abs(path)
 	src := &configSource{
-		Label:  abs,
-		Kind:   "toml",
-		Diff:   cfg.Block.Diff,
-		Msg:    cfg.Block.Msg,
-		Push:   cfg.Block.Push,
-		Branch: cfg.Block.Branch,
+		Label:       abs,
+		Kind:        "toml",
+		Diff:        cfg.Block.Diff,
+		Msg:         cfg.Block.Msg,
+		Push:        cfg.Block.Push,
+		Branch:      cfg.Block.Branch,
+		MsgMaxLen:   cfg.Block.MsgMaxLen,
+		MsgMaxLines: cfg.Block.MsgMaxLines,
 	}
 	// Skip empty sources
-	if len(src.Diff) == 0 && len(src.Msg) == 0 && src.Push == nil && len(src.Branch) == 0 {
+	if len(src.Diff) == 0 && len(src.Msg) == 0 && src.Push == nil && len(src.Branch) == 0 &&
+		src.MsgMaxLen == 0 && src.MsgMaxLines == 0 {
 		return nil, nil
 	}
 	return src, nil

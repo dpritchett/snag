@@ -611,6 +611,73 @@ func TestHasAnyPatterns(t *testing.T) {
 	})
 }
 
+func TestHasAnyPatterns_StructuralLimits(t *testing.T) {
+	t.Run("msg_max_len only", func(t *testing.T) {
+		bc := &BlockConfig{MsgMaxLen: 72}
+		if !bc.HasAnyPatterns() {
+			t.Error("expected true with msg_max_len set")
+		}
+	})
+	t.Run("msg_max_lines only", func(t *testing.T) {
+		bc := &BlockConfig{MsgMaxLines: 3}
+		if !bc.HasAnyPatterns() {
+			t.Error("expected true with msg_max_lines set")
+		}
+	})
+}
+
+func TestMergeTOML_StructuralLimits(t *testing.T) {
+	dir := t.TempDir()
+
+	// Child: msg_max_len=50, msg_max_lines=2
+	child := filepath.Join(dir, "child.toml")
+	os.WriteFile(child, []byte("[block]\nmsg_max_len = 50\nmsg_max_lines = 2\n"), 0644)
+
+	// Parent: msg_max_len=72, msg_max_lines=5
+	parent := filepath.Join(dir, "parent.toml")
+	os.WriteFile(parent, []byte("[block]\nmsg_max_len = 72\nmsg_max_lines = 5\n"), 0644)
+
+	bc := &BlockConfig{}
+	if err := mergeTOML(bc, child); err != nil {
+		t.Fatalf("merge child: %v", err)
+	}
+	if err := mergeTOML(bc, parent); err != nil {
+		t.Fatalf("merge parent: %v", err)
+	}
+
+	// Should take the max of each
+	if bc.MsgMaxLen != 72 {
+		t.Errorf("MsgMaxLen = %d, want 72 (max of 50, 72)", bc.MsgMaxLen)
+	}
+	if bc.MsgMaxLines != 5 {
+		t.Errorf("MsgMaxLines = %d, want 5 (max of 2, 5)", bc.MsgMaxLines)
+	}
+}
+
+func TestMergeTOML_StructuralLimits_ZeroIgnored(t *testing.T) {
+	dir := t.TempDir()
+
+	// Child: no structural limits (zero values)
+	child := filepath.Join(dir, "child.toml")
+	os.WriteFile(child, []byte("[block]\nmsg = [\"todo\"]\n"), 0644)
+
+	// Parent: msg_max_len=72
+	parent := filepath.Join(dir, "parent.toml")
+	os.WriteFile(parent, []byte("[block]\nmsg_max_len = 72\n"), 0644)
+
+	bc := &BlockConfig{}
+	if err := mergeTOML(bc, child); err != nil {
+		t.Fatalf("merge child: %v", err)
+	}
+	if err := mergeTOML(bc, parent); err != nil {
+		t.Fatalf("merge parent: %v", err)
+	}
+
+	if bc.MsgMaxLen != 72 {
+		t.Errorf("MsgMaxLen = %d, want 72 (zero should not override)", bc.MsgMaxLen)
+	}
+}
+
 func TestPushPatterns(t *testing.T) {
 	t.Run("nil push falls back to diff+msg", func(t *testing.T) {
 		bc := &BlockConfig{

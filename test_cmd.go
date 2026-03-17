@@ -36,7 +36,7 @@ func buildTestCmd() *cobra.Command {
 				return err
 			}
 			patterns := deduplicatePatterns(append(append([]string{}, bc.Diff...), bc.Msg...))
-			if len(patterns) == 0 {
+			if len(patterns) == 0 && !bc.HasAnyPatterns() {
 				infof("nothing to test — no patterns found in snag.toml")
 				return nil
 			}
