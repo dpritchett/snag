@@ -96,6 +96,10 @@ Run `lefthook install` and you're set.
 Each recipe is independent. A repo can pull one or all of them. Pin `ref` to a
 tag (e.g. `ref: v1.0.0`) for stability, or use `main` to track latest.
 
+`lefthook-go.yml` intentionally does not use `glob: "*.go"`. Its commands run
+repo-wide already, and a root-only glob would skip staged changes in nested Go
+packages like `cmd/` and `internal/`.
+
 **Local overrides.** Any repo can add a `lefthook-local.yml` to extend or
 override what the remote recipes provide. lefthook merges local config on top of
 remote config automatically.

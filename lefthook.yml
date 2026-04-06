@@ -4,13 +4,10 @@ pre-commit:
     - name: snag-filter
       run: snag check diff
     - name: go-fmt
-      glob: "*.go"
       run: gofmt -l . | grep . && exit 1 || true
     - name: go-vet
-      glob: "*.go"
       run: go vet ./...
     - name: go-test
-      glob: "*.go"
       run: go test ./...
 
 commit-msg:

@@ -1,15 +1,12 @@
 pre-commit:
   jobs:
     - name: go-fmt
-      glob: "*.go"
       run: go fmt ./...
       stage_fixed: true
       fail_text: "go fmt reformatted files — changes have been staged, please re-commit."
     - name: go-vet
-      glob: "*.go"
       run: go vet ./...
       fail_text: "go vet found issues."
     - name: go-test
-      glob: "*.go"
       run: go test ./...
       fail_text: "go test failed."
