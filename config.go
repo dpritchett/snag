@@ -15,6 +15,7 @@ import (
 type snagTOML struct {
 	MinVersion string       `toml:"min_version"`
 	Block      blockSection `toml:"block"`
+	Audit      auditSection `toml:"audit"`
 }
 
 // blockSection maps each hook phase to its own pattern list.
@@ -27,6 +28,10 @@ type blockSection struct {
 	MsgMaxLines int       `toml:"msg_max_lines"`
 }
 
+type auditSection struct {
+	Limit *int `toml:"limit"`
+}
+
 // BlockConfig holds the resolved per-hook pattern lists.
 // Push is nil when not explicitly set (fallback to Diff+Msg union).
 type BlockConfig struct {
@@ -34,8 +39,9 @@ type BlockConfig struct {
 	Msg         []string
 	Push        []string // nil = "not explicitly set" (falls back to Diff+Msg)
 	Branch      []string
-	MsgMaxLen   int // max characters on first content line (0 = unlimited)
-	MsgMaxLines int // max non-blank, non-comment lines (0 = unlimited)
+	MsgMaxLen   int  // max characters on first content line (0 = unlimited)
+	MsgMaxLines int  // max non-blank, non-comment lines (0 = unlimited)
+	AuditLimit  *int // nil = use built-in default
 }
 
 // PushPatterns returns Push if explicitly set, otherwise the union of Diff and Msg.
@@ -49,7 +55,7 @@ func (bc *BlockConfig) PushPatterns() []string {
 // HasAnyPatterns reports whether any field has at least one pattern.
 func (bc *BlockConfig) HasAnyPatterns() bool {
 	return len(bc.Diff) > 0 || len(bc.Msg) > 0 || len(bc.Push) > 0 || len(bc.Branch) > 0 ||
-		bc.MsgMaxLen > 0 || bc.MsgMaxLines > 0
+		bc.MsgMaxLen > 0 || bc.MsgMaxLines > 0 || bc.AuditLimit != nil
 }
 
 // loadSnagTOML parses a single snag.toml file. A missing file returns zero value with no error.
@@ -69,6 +75,9 @@ func loadSnagTOML(path string) (snagTOML, error) {
 		if err := checkMinVersion(cfg.MinVersion, path); err != nil {
 			return cfg, err
 		}
+	}
+	if cfg.Audit.Limit != nil && *cfg.Audit.Limit < 0 {
+		return cfg, fmt.Errorf("%s: audit.limit must be >= 0", path)
 	}
 	return cfg, nil
 }
@@ -126,13 +135,13 @@ func walkConfig(dir string) (*BlockConfig, bool, error) {
 		localPath := filepath.Join(current, "snag-local.toml")
 
 		if fileExists(tomlPath) {
-			if err := mergeTOML(bc, tomlPath); err != nil {
+			if err := mergeTOML(bc, tomlPath, false); err != nil {
 				return nil, false, err
 			}
 			found = true
 		}
 		if fileExists(localPath) {
-			if err := mergeTOML(bc, localPath); err != nil {
+			if err := mergeTOML(bc, localPath, true); err != nil {
 				return nil, false, err
 			}
 			found = true
@@ -158,11 +167,16 @@ func fileExists(path string) bool {
 }
 
 // mergeTOML reads a snag.toml and appends its patterns into bc.
-func mergeTOML(bc *BlockConfig, path string) error {
+// If forceAuditOverride is true, scalar audit settings from this file override
+// any previously resolved value. This lets `snag-local.toml` override
+// `snag.toml` in the same directory while still preserving nearest-config-wins
+// behavior as the walk moves toward parent directories.
+func mergeTOML(bc *BlockConfig, path string, forceAuditOverride ...bool) error {
 	cfg, err := loadSnagTOML(path)
 	if err != nil {
 		return err
 	}
+	overrideAudit := len(forceAuditOverride) > 0 && forceAuditOverride[0]
 	bc.Diff = append(bc.Diff, cfg.Block.Diff...)
 	bc.Msg = append(bc.Msg, cfg.Block.Msg...)
 	if cfg.Block.Push != nil {
@@ -176,6 +190,10 @@ func mergeTOML(bc *BlockConfig, path string) error {
 	}
 	if cfg.Block.MsgMaxLines > bc.MsgMaxLines {
 		bc.MsgMaxLines = cfg.Block.MsgMaxLines
+	}
+	if cfg.Audit.Limit != nil && (bc.AuditLimit == nil || overrideAudit) {
+		limit := *cfg.Audit.Limit
+		bc.AuditLimit = &limit
 	}
 	return nil
 }
@@ -238,7 +256,6 @@ func resolveBlockConfig(cmd *cobra.Command) (*BlockConfig, error) {
 	if env := os.Getenv("SNAG_IGNORE"); env != "" {
 		applyIgnore(bc, env)
 	}
-
 	return bc, nil
 }
 

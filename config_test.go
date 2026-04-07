@@ -104,6 +104,35 @@ email = "test@example.com"
 		}
 	})
 
+	t.Run("audit limit parses", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "snag.toml")
+		os.WriteFile(path, []byte(`
+[audit]
+limit = 7
+`), 0644)
+		cfg, err := loadSnagTOML(path)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.Audit.Limit == nil || *cfg.Audit.Limit != 7 {
+			t.Fatalf("audit.limit: got %v, want 7", cfg.Audit.Limit)
+		}
+	})
+
+	t.Run("audit limit rejects negatives", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "snag.toml")
+		os.WriteFile(path, []byte(`
+[audit]
+limit = -1
+`), 0644)
+		_, err := loadSnagTOML(path)
+		if err == nil {
+			t.Fatal("expected error for negative audit.limit")
+		}
+	})
+
 	t.Run("malformed TOML", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "snag.toml")
@@ -261,6 +290,36 @@ diff = ["HACK"]
 			t.Errorf("expected push=nil, got %v", bc.Push)
 		}
 	})
+
+	t.Run("nearest audit limit wins, local overrides team", func(t *testing.T) {
+		parent := t.TempDir()
+		child := filepath.Join(parent, "child")
+		os.MkdirAll(child, 0755)
+
+		os.WriteFile(filepath.Join(parent, "snag.toml"), []byte(`
+[audit]
+limit = 25
+`), 0644)
+		os.WriteFile(filepath.Join(child, "snag.toml"), []byte(`
+[audit]
+limit = 12
+`), 0644)
+		os.WriteFile(filepath.Join(child, "snag-local.toml"), []byte(`
+[audit]
+limit = 3
+`), 0644)
+
+		bc, found, err := walkConfig(child)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !found {
+			t.Fatal("expected found=true")
+		}
+		if bc.AuditLimit == nil || *bc.AuditLimit != 3 {
+			t.Fatalf("audit limit: got %v, want 3", bc.AuditLimit)
+		}
+	})
 }
 
 func TestResolveBlockConfig(t *testing.T) {
@@ -391,6 +450,28 @@ push = ["SECRET"]
 		push := bc.PushPatterns()
 		if len(push) != 1 || push[0] != "secret" {
 			t.Errorf("push patterns: got %v, want [secret]", push)
+		}
+	})
+
+	t.Run("audit limit resolves from config", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "snag.toml"), []byte(`
+[audit]
+limit = 9
+`), 0644)
+
+		orig, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(orig)
+
+		t.Setenv("SNAG_PROTECTED_BRANCHES", "")
+
+		bc, err := resolveBlockConfig(makeCmd())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if bc.AuditLimit == nil || *bc.AuditLimit != 9 {
+			t.Fatalf("audit limit: got %v, want 9", bc.AuditLimit)
 		}
 	})
 

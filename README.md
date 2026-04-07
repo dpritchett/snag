@@ -205,7 +205,7 @@ against `diff` patterns, then reports every match.
 
 ```
 $ snag audit
-snag: scanning 50 commits...
+snag: scanning 10 commits...
 
   abc1234 — "Add integration config"
     diff: match "HACK" in commit diff
@@ -214,18 +214,28 @@ snag: scanning 50 commits...
     msg:  match "fixup!" in commit msg
     diff: match "HACK" in commit diff
 
-snag: 3 violations found in 2 of 50 commits
+snag: 3 violations found in 2 of 10 commits
 ```
 
 Exits 1 when violations are found, 0 when clean — CI-friendly.
 
 ```bash
-snag audit                    # last 50 commits (default)
+snag audit                    # config value or last 10 commits
 snag audit --limit 10         # last 10 commits
 snag audit --limit 0          # full history
 snag audit main..HEAD         # explicit range
 snag audit -q                 # summary line + exit code only
 ```
+
+Set the default audit window in `snag.toml` or `snag-local.toml`:
+
+```toml
+[audit]
+limit = 25
+```
+
+`audit.limit = 0` scans full history by default. CLI `--limit` still wins when
+you need a one-off override.
 
 ### Flags
 

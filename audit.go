@@ -27,13 +27,13 @@ func buildAuditCmd() *cobra.Command {
 		Short: "Scan git history for policy violations",
 		Long: `Scan commits for block-pattern matches in messages and diffs.
 
-Default range: last 50 commits (HEAD~50..HEAD).
+Default range: config value or last 10 commits (HEAD~10..HEAD).
 Override with an explicit range like main..HEAD or --limit 0 for all.`,
 		SilenceUsage: true,
 		Args:         cobra.MaximumNArgs(1),
 		RunE:         runAudit,
 	}
-	cmd.Flags().Int("limit", 50, "max commits to scan (0 = unlimited)")
+	cmd.Flags().Int("limit", -1, "max commits to scan (default: config or 10, 0 = unlimited)")
 	return cmd
 }
 
@@ -48,6 +48,13 @@ func runAudit(cmd *cobra.Command, args []string) error {
 
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	limit, _ := cmd.Flags().GetInt("limit")
+	if cmd.Flags().Changed("limit") {
+		if limit < 0 {
+			return fmt.Errorf("--limit must be >= 0")
+		}
+	} else {
+		limit = defaultAuditLimit(bc)
+	}
 
 	shas, err := auditRevList(args, limit)
 	if err != nil {
@@ -238,4 +245,13 @@ func splitDiffByCommit(output string, shas []string) map[string]string {
 		chunks[currentSHA] = buf.String()
 	}
 	return chunks
+}
+
+const builtinAuditLimit = 10
+
+func defaultAuditLimit(bc *BlockConfig) int {
+	if bc.AuditLimit != nil {
+		return *bc.AuditLimit
+	}
+	return builtinAuditLimit
 }

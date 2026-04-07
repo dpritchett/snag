@@ -264,3 +264,96 @@ func TestAudit_ExplicitRange(t *testing.T) {
 		t.Fatal("expected error for range including violation commit")
 	}
 }
+
+func TestDefaultAuditLimit(t *testing.T) {
+	dir := initGitRepo(t)
+	initialCommit(t, dir)
+	commitFile(t, dir, "violation.txt", "this is a HACK\n", "old violation")
+	for i := 0; i < 11; i++ {
+		name := string(rune('a'+i)) + ".txt"
+		commitFile(t, dir, name, "clean\n", "clean commit")
+	}
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"), []byte("[block]\ndiff = [\"hack\"]\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"audit"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("expected built-in default limit of 10 to skip older violation, got: %v", err)
+	}
+}
+
+func TestAudit_ConfigLimit(t *testing.T) {
+	dir := initGitRepo(t)
+	initialCommit(t, dir)
+	commitFile(t, dir, "a.txt", "this is a HACK\n", "old violation")
+	for i := 0; i < 11; i++ {
+		name := string(rune('b'+i)) + ".txt"
+		commitFile(t, dir, name, "clean\n", "clean commit")
+	}
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"), []byte("[block]\ndiff = [\"hack\"]\n\n[audit]\nlimit = 15\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"audit"})
+	if err := rootCmd.Execute(); err == nil {
+		t.Fatal("expected config audit.limit to include older violation")
+	}
+}
+
+func TestAudit_LocalConfigOverridesParentLimit(t *testing.T) {
+	parent := initGitRepo(t)
+	child := filepath.Join(parent, "child")
+	if err := os.MkdirAll(child, 0755); err != nil {
+		t.Fatalf("mkdir child: %v", err)
+	}
+	initialCommit(t, parent)
+	commitFile(t, parent, "a.txt", "this is a HACK\n", "old violation")
+	for i := 0; i < 11; i++ {
+		name := string(rune('b'+i)) + ".txt"
+		commitFile(t, parent, name, "clean\n", "clean commit")
+	}
+
+	os.WriteFile(filepath.Join(parent, "snag.toml"), []byte("[block]\ndiff = [\"hack\"]\n\n[audit]\nlimit = 15\n"), 0644)
+	os.WriteFile(filepath.Join(child, "snag-local.toml"), []byte("[audit]\nlimit = 5\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(child)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"audit"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("expected child snag-local.toml to lower audit limit and skip older violation, got: %v", err)
+	}
+}
+
+func TestAudit_LimitFlagOverridesConfig(t *testing.T) {
+	dir := initGitRepo(t)
+	initialCommit(t, dir)
+	commitFile(t, dir, "a.txt", "this is a HACK\n", "old violation")
+	for i := 0; i < 11; i++ {
+		name := string(rune('b'+i)) + ".txt"
+		commitFile(t, dir, name, "clean\n", "clean commit")
+	}
+
+	os.WriteFile(filepath.Join(dir, "snag.toml"), []byte("[block]\ndiff = [\"hack\"]\n\n[audit]\nlimit = 15\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(oldDir)
+
+	rootCmd := buildRootCmd()
+	rootCmd.SetArgs([]string{"audit", "--limit", "5"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("expected CLI --limit to override config and skip older violation, got: %v", err)
+	}
+}
